@@ -3,3 +3,4 @@ db.sqlite3
 /internet_shop/__pycache__
 /internet_shop/migrations
 /app/__pycache__
+media

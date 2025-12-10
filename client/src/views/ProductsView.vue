@@ -17,6 +17,10 @@ const products = ref([]);
 const categories = ref([]);
 const productToAdd = ref({ name: '', price: null, description: '', quantity: null, category: null });
 const productToEdit = ref({ id: null, name: '', price: null, description: '', quantity: null, category: null });
+const productsPictureRef = ref();
+const productsAddImageUrl = ref();
+
+const imageModalUrl = ref("")
 
 const groupsById = computed(() => {
   const map = {};
@@ -46,20 +50,64 @@ async function fetchCategories() {
   loading.value = false;
 }
 
+async function productsAddPictureChange() {
+  productsAddImageUrl.value = URL.createObjectURL(productsPictureRef.value.files[0])
+}
+
 async function onProductAdd() {
-  await axios.post("/api/products/", {
-    ...productToAdd.value,
+  const formData = new FormData();
+
+  // вытаскиваем выбранный файл с формы через studentsPictureRef.value.files
+  formData.append('picture', productsPictureRef.value.files[0]);
+
+  // явно привязываем поля из studentToAdd
+  formData.set('name', productToAdd.value.name)
+  formData.set('price', productToAdd.value.price)
+  formData.set('description', productToAdd.value.description)
+  formData.set('quantity', productToAdd.value.quantity)
+  formData.set('category', productToAdd.value.category)
+
+  // ну и тут указываем в заголовке что отправляем данные с файлом
+  await axios.post("/api/products/", formData, {
+      headers: {
+          'Content-Type': 'multipart/form-data'
+      }
   });
   await fetchProducts();
   await fetchCategories();
+
+  /*await axios.post("/api/products/", {
+    ...productToAdd.value,
+  });
+  await fetchProducts();
+  await fetchCategories();*/
   // Сброс формы
   productToAdd.value = { name: '', price: null, description: '', quantity: null, category: null };
 }
 
 async function onUpdateProduct() {
-  await axios.put(`/api/products/${productToEdit.value.id}/`, {
-    ...productToEdit.value,
+  const formData = new FormData();
+
+  // вытаскиваем выбранный файл с формы через studentsPictureRef.value.files
+  formData.append('picture', productsPictureRef.value.files[0]);
+
+  // явно привязываем поля из studentToEdit
+  formData.set('name', productToEdit.value.name)
+  formData.set('price', productToEdit.value.price)
+  formData.set('description', productToEdit.value.description)
+  formData.set('quantity', productToEdit.value.quantity)
+  formData.set('category', productToEdit.value.category)
+
+  // ну и тут указываем в заголовке что отправляем данные с файлом
+  await axios.put(`/api/products/${productToEdit.value.id}/`, formData, {
+      headers: {
+          'Content-Type': 'multipart/form-data'
+      }
   });
+
+  /*await axios.put(`/api/products/${productToEdit.value.id}/`, {
+    ...productToEdit.value,
+  });*/
   await fetchProducts();
 }
 
@@ -81,9 +129,27 @@ onBeforeMount(async () => {
   await fetchProducts()
   await fetchCategories()
 })
+
+function openImageModal(imageUrl) {
+  imageModalUrl.value = imageUrl
+}
 </script>
 
 <template>
+  <div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5">Просмотр изображения</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-center">
+          <img :src="imageModalUrl" class="img-fluid" style="max-height:70vh" alt="" />
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="container my-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1>Товары</h1>
@@ -116,6 +182,22 @@ onBeforeMount(async () => {
               />
               <label for="floatingInput">Цена</label>
             </div>
+          </div>
+          <div class="col-auto">
+            <div class="form-floating">
+              <input
+                type="file"
+                class="form-control"
+                ref="productsPictureRef"
+                @change="productsAddPictureChange"
+              />
+            </div>
+          </div>
+          <div class="col-auto">
+            <img :src="productsAddImageUrl" 
+            style="max-height: 60px;" 
+            alt=""
+            >
           </div>
           <div class="col">
             <div class="form-floating">
@@ -173,7 +255,7 @@ onBeforeMount(async () => {
           </div>
           <div class="modal-body">
             <div class="row">
-              <div class="col-3">
+              <div class="col-2">
                 <div class="form-floating">
                   <input
                     type="text"
@@ -203,6 +285,7 @@ onBeforeMount(async () => {
                   <label for="floatingInput">Описание</label>
                 </div>
               </div>
+
               <div class="col-2">
                 <div class="form-floating">
                   <input
@@ -213,7 +296,7 @@ onBeforeMount(async () => {
                   <label for="floatingInput">Количество</label>
                 </div>
               </div>
-              <div class="col-2">
+              <div class="col-3">
                 <div class="form-floating">
                   <select class="form-select" v-model="productToEdit.category">
                     <option :value="g.id" v-for="g in categories">
@@ -222,6 +305,24 @@ onBeforeMount(async () => {
                   </select>
                   <label for="floatingInput">Группа</label>
                 </div>
+              </div>
+            </div>
+            <div class="row" style="margin-top: 3px;">
+              <div class="col-auto">
+                <div class="form-floating">
+                  <input
+                    type="file"
+                    class="form-control"
+                    ref="productsPictureRef"
+                    @change="productsAddPictureChange"
+                  />
+                </div>
+              </div>
+              <div class="col-auto">
+                <img :src="productsAddImageUrl" 
+                style="max-height: 60px;" 
+                alt=""
+                >
               </div>
             </div>
           </div>
@@ -257,14 +358,26 @@ onBeforeMount(async () => {
             </div>
           </div>
           
-          <div class="col-md-3">
+          <div class="col-md-2">
             <div class="product-meta">
               <small class="text-muted d-block">Цена: {{ item.price }} ₽</small>
               <small class="text-muted d-block">В наличии: {{ item.quantity }} шт.</small>
             </div>
           </div>
+
+          <div class="col-md-2">
+            <div v-show="item.picture">
+              <img :src="item.picture" 
+              data-bs-toggle="modal"
+              data-bs-target="#imageModal"
+              @click="openImageModal(item.picture)"
+              style="max-height: 60px; cursor: pointer;" 
+              alt=""
+              ></img>
+            </div>
+          </div>
           
-          <div class="col-md-3">
+          <div class="col-md-2">
             <div class="d-flex gap-2 justify-content-end">
               <button
                 class="btn btn-outline-primary btn-lg"

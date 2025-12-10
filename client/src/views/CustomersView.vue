@@ -7,7 +7,7 @@ import ProductList from '../components/customers/CustomerList.vue'
 </script>-->
 
 <script setup>
-import axios from "axios";
+import axios, { Axios } from "axios";
 import { ref, onBeforeMount, computed } from 'vue';
 import Cookies from 'js-cookie';
 
@@ -15,6 +15,10 @@ const loading = ref(false);
 const customers = ref([]);
 const customerToAdd = ref({ name: '', address: '', phone_number: '', email: '' });
 const customerToEdit = ref({ id: null, name: '', address: '', phone_number: '', email: '' });
+const customersPictureRef = ref();
+const customersAddImageUrl = ref();
+
+const imageModalUrl = ref("")
 
 onBeforeMount(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
@@ -27,19 +31,60 @@ async function fetchCustomers() {
   loading.value = false;
 }
 
+async function customersAddPictureChange() {
+  customersAddImageUrl.value = URL.createObjectURL(customersPictureRef.value.files[0])
+}
+
 async function onCustomerAdd() {
-  await axios.post("/api/customers/", {
-    ...customerToAdd.value,
+  const formData = new FormData();
+
+  // вытаскиваем выбранный файл с формы через studentsPictureRef.value.files
+  formData.append('picture', customersPictureRef.value.files[0]);
+
+  // явно привязываем поля из customerToAdd
+  formData.set('name', customerToAdd.value.name)
+  formData.set('address', customerToAdd.value.address)
+  formData.set('phone_number', customerToAdd.value.phone_number)
+  formData.set('email', customerToAdd.value.email)
+
+  // ну и тут указываем в заголовке что отправляем данные с файлом
+  await axios.post("/api/customers/", formData, {
+      headers: {
+          'Content-Type': 'multipart/form-data'
+      }
   });
   await fetchCustomers();
+
+  /*await axios.post("/api/customers/", {
+    ...customerToAdd.value,
+  });
+  await fetchCustomers();*/
   // Сброс формы
   customerToAdd.value = { name: '', address: '', phone_number: '', email: '' };
 }
 
 async function onUpdateCustomer() {
-  await axios.put(`/api/customers/${customerToEdit.value.id}/`, {
-    ...сustomerToEdit.value,
+  const formData = new FormData();
+
+  // вытаскиваем выбранный файл с формы через studentsPictureRef.value.files
+  formData.append('picture', customersPictureRef.value.files[0]);
+
+  // явно привязываем поля из studentToEdit
+  formData.set('name', customerToEdit.value.name)
+  formData.set('address', customerToEdit.value.address)
+  formData.set('phone_number', customerToEdit.value.phone_number)
+  formData.set('email', customerToEdit.value.email)
+
+  // ну и тут указываем в заголовке что отправляем данные с файлом
+  await axios.put(`/api/customers/${customerToEdit.value.id}/`, formData, {
+      headers: {
+          'Content-Type': 'multipart/form-data'
+      }
   });
+
+  /*await axios.put(`/api/customers/${customerToEdit.value.id}/`, {
+    ...сustomerToEdit.value,
+  });*/
   await fetchCustomers();
 }
 
@@ -49,7 +94,7 @@ async function onRemoveClick(customer) {
 }
 
 async function onCustomerEditClick(customer) {
-  сustomerToEdit.value = { ...customer };
+  customerToEdit.value = { ...customer };
 }
 
 async function onLoadClick() {
@@ -59,9 +104,27 @@ async function onLoadClick() {
 onBeforeMount(async () => {
   await fetchCustomers()
 })
+
+function openImageModal(imageUrl) {
+  imageModalUrl.value = imageUrl
+}
 </script>
 
 <template>
+  <div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5">Просмотр изображения</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-center">
+          <img :src="imageModalUrl" class="img-fluid" style="max-height:70vh" alt="" />
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="container my-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1>Клиенты</h1>
@@ -94,6 +157,22 @@ onBeforeMount(async () => {
               />
               <label for="floatingInput">Адрес</label>
             </div>
+          </div>
+          <div class="col-auto">
+            <div class="form-floating">
+              <input
+                type="file"
+                class="form-control"
+                ref="customersPictureRef"
+                @change="customersAddPictureChange"
+              />
+            </div>
+          </div>
+          <div class="col-auto">
+            <img :src="customersAddImageUrl" 
+            style="max-height: 60px;" 
+            alt=""
+            >
           </div>
           <div class="col">
             <div class="form-floating">
@@ -184,6 +263,24 @@ onBeforeMount(async () => {
                 </div>
               </div>
             </div>
+            <div class="row" style="margin-top: 3px;">
+              <div class="col-auto">
+                <div class="form-floating">
+                  <input
+                    type="file"
+                    class="form-control"
+                    ref="customersPictureRef"
+                    @change="customersAddPictureChange"
+                  />
+                </div>
+              </div>
+              <div class="col-auto">
+                <img :src="customersAddImageUrl" 
+                style="max-height: 60px;" 
+                alt=""
+                >
+              </div>
+            </div>
           </div>
           <div class="modal-footer">
             <button
@@ -213,14 +310,26 @@ onBeforeMount(async () => {
             <h5 class="card-title text-primary mb-2">{{ item.name }}</h5>
           </div>
           
-          <div class="col-md-3">
+          <div class="col-md-2">
             <div class="product-meta">
               <small class="text-muted d-block">Адрес: {{ item.address }}</small>
               <small class="text-muted d-block">Номер телефона: {{ item.phone_number }}</small>
             </div>
           </div>
+
+          <div class="col-md-2">
+            <div v-show="item.picture">
+              <img :src="item.picture" 
+              data-bs-toggle="modal"
+              data-bs-target="#imageModal"
+              @click="openImageModal(item.picture)"
+              style="max-height: 60px; cursor: pointer;" 
+              alt=""
+              ></img>
+            </div>
+          </div>
           
-          <div class="col-md-3">
+          <div class="col-md-2">
             <div class="d-flex gap-2 justify-content-end">
               <button
                 class="btn btn-outline-primary btn-lg"

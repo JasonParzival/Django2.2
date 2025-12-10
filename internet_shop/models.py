@@ -7,6 +7,8 @@ class Product(models.Model):
     description = models.TextField("Описание")
     quantity = models.IntegerField("Количество на складе")
     category = models.ForeignKey("Category", on_delete=models.CASCADE, null=True, verbose_name="Категория")
+    # добавим ImageField, в upload_to указываем папку куда загружать файл
+    picture = models.ImageField("Изображение", null=True, upload_to="products")
     
     class Meta:
         verbose_name = "Товар"
@@ -32,6 +34,7 @@ class Customer(models.Model):
     address = models.TextField("Адрес")
     phone_number = models.TextField("Номер телефона")
     email = models.TextField("Электронная почта")
+    picture = models.ImageField("Изображение", null=True, upload_to="customers")
     
     class Meta:
         verbose_name = "Клиент"
