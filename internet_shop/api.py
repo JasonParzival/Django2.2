@@ -27,6 +27,14 @@ class ProductsViewset(
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     
+    '''def get_queryset(self):
+        qs = super().get_queryset()
+        
+        # фильтруем по текущему юзеру
+        qs = qs.filter(user=self.request.user)
+
+        return qs'''
+    
 class CategoriesViewset(
     mixins.UpdateModelMixin,
     mixins.CreateModelMixin,

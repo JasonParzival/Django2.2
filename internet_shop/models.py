@@ -9,6 +9,7 @@ class Product(models.Model):
     category = models.ForeignKey("Category", on_delete=models.CASCADE, null=True, verbose_name="Категория")
     # добавим ImageField, в upload_to указываем папку куда загружать файл
     picture = models.ImageField("Изображение", null=True, upload_to="products")
+    #user = models.ForeignKey("auth.User", verbose_name="Пользователь", on_delete=models.CASCADE, null=True)
     
     class Meta:
         verbose_name = "Товар"
