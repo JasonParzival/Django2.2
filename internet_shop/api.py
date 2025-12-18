@@ -1,6 +1,11 @@
 from rest_framework.viewsets import GenericViewSet
 from rest_framework import mixins
 
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import serializers
+from django.db.models import Avg, Count, Max, Min, Sum
+
 from internet_shop.models import Product
 from internet_shop.serializers import ProductSerializer
 
@@ -34,6 +39,27 @@ class ProductsViewset(
         qs = qs.filter(user=self.request.user)
 
         return qs'''
+        
+    class ProductStatsSerializer(serializers.Serializer):
+        total_count = serializers.IntegerField()
+        avg_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+        min_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+        max_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+        total_stock = serializers.IntegerField()
+    
+    @action(detail=False, methods=["GET"], url_path="stats")
+    def get_stats(self, request, *args, **kwargs):
+        # Агрегатные запросы для статистики по продуктам
+        stats = Product.objects.aggregate(
+            total_count=Count("id"),
+            avg_price=Avg("price"),
+            min_price=Min("price"),
+            max_price=Max("price"),
+            total_stock=Sum("quantity")
+        )
+        
+        serializer = self.ProductStatsSerializer(instance=stats)
+        return Response(serializer.data)
     
 class CategoriesViewset(
     mixins.UpdateModelMixin,
@@ -46,6 +72,35 @@ class CategoriesViewset(
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     
+    class CategoryStatsSerializer(serializers.Serializer):
+        total_count = serializers.IntegerField()
+        total_products = serializers.IntegerField()
+        avg_products_per_category = serializers.FloatField()
+    
+    @action(detail=False, methods=["GET"], url_path="stats")
+    def get_stats(self, request, *args, **kwargs):
+        # Базовая статистика по категориям
+        total_categories = Category.objects.count()
+        total_products = Product.objects.count()
+        
+        # Количество продуктов в каждой категории
+        categories_with_products = Category.objects.annotate(
+            product_count=Count('product')
+        )
+        
+        avg_products = categories_with_products.aggregate(
+            avg=Avg('product_count')
+        )['avg'] or 0
+        
+        stats = {
+            'total_count': total_categories,
+            'total_products': total_products,
+            'avg_products_per_category': round(avg_products, 2)
+        }
+        
+        serializer = self.CategoryStatsSerializer(instance=stats)
+        return Response(serializer.data)
+    
 class CustomersViewset(
     mixins.UpdateModelMixin,
     mixins.CreateModelMixin,
@@ -56,6 +111,36 @@ class CustomersViewset(
 ):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
+    
+    class CustomerStatsSerializer(serializers.Serializer):
+        total_count = serializers.IntegerField()
+        customers_with_orders = serializers.IntegerField()
+        total_orders = serializers.IntegerField()
+        avg_orders_per_customer = serializers.FloatField()
+    
+    @action(detail=False, methods=["GET"], url_path="stats")
+    def get_stats(self, request, *args, **kwargs):
+        # Статистика по клиентам
+        total_customers = Customer.objects.count()
+        total_orders = Order.objects.count()
+        
+        # Клиенты с заказами
+        customers_with_orders = Customer.objects.filter(
+            order__isnull=False
+        ).distinct().count()
+        
+        # Среднее количество заказов на клиента
+        avg_orders = total_orders / total_customers if total_customers > 0 else 0
+        
+        stats = {
+            'total_count': total_customers,
+            'customers_with_orders': customers_with_orders,
+            'total_orders': total_orders,
+            'avg_orders_per_customer': round(avg_orders, 2)
+        }
+        
+        serializer = self.CustomerStatsSerializer(instance=stats)
+        return Response(serializer.data)
     
 class OrdersViewset(
     mixins.UpdateModelMixin,
@@ -68,6 +153,48 @@ class OrdersViewset(
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     
+    class OrderStatsSerializer(serializers.Serializer):
+        total_count = serializers.IntegerField()
+        orders_today = serializers.IntegerField()
+        orders_this_month = serializers.IntegerField()
+        status_distribution = serializers.DictField()
+    
+    @action(detail=False, methods=["GET"], url_path="stats")
+    def get_stats(self, request, *args, **kwargs):
+        from django.utils import timezone
+        from django.db.models import Q
+        
+        # Базовые агрегаты
+        total_orders = Order.objects.count()
+        
+        # Заказы за сегодня
+        today = timezone.now().date()
+        orders_today = Order.objects.filter(date=today).count()
+        
+        # Заказы за текущий месяц
+        current_month = timezone.now().month
+        current_year = timezone.now().year
+        orders_this_month = Order.objects.filter(
+            date__month=current_month,
+            date__year=current_year
+        ).count()
+        
+        # Распределение по статусам
+        status_distribution = {}
+        for status_value, status_label in Order._meta.get_field('status').choices:
+            count = Order.objects.filter(status=status_value).count()
+            status_distribution[status_label] = count
+        
+        stats = {
+            'total_count': total_orders,
+            'orders_today': orders_today,
+            'orders_this_month': orders_this_month,
+            'status_distribution': status_distribution
+        }
+        
+        serializer = self.OrderStatsSerializer(instance=stats)
+        return Response(serializer.data)
+    
 class OrderDetailsViewset(
     mixins.UpdateModelMixin,
     mixins.CreateModelMixin,
@@ -78,3 +205,24 @@ class OrderDetailsViewset(
 ):
     queryset = OrderDetail.objects.all()
     serializer_class = OrderDetailSerializer
+    
+    class OrderDetailStatsSerializer(serializers.Serializer):
+        total_count = serializers.IntegerField()
+        total_quantity = serializers.IntegerField()
+        avg_quantity = serializers.FloatField()
+        min_quantity = serializers.IntegerField()
+        max_quantity = serializers.IntegerField()
+    
+    @action(detail=False, methods=["GET"], url_path="stats")
+    def get_stats(self, request, *args, **kwargs):
+        # Агрегатные запросы для деталей заказов
+        stats = OrderDetail.objects.aggregate(
+            total_count=Count("id"),
+            total_quantity=Sum("quantity"),
+            avg_quantity=Avg("quantity"),
+            min_quantity=Min("quantity"),
+            max_quantity=Max("quantity")
+        )
+        
+        serializer = self.OrderDetailStatsSerializer(instance=stats)
+        return Response(serializer.data)

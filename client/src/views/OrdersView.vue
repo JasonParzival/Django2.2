@@ -1,15 +1,6 @@
-<!--<template>
-  <ProductList />
-</template>
-
-<script setup>
-import ProductList from '../components/products/ProductList.vue'
-</script>-->
-
-<!-- ProductsComponent.vue -->
 <script setup>
 import axios from "axios";
-import { ref, onBeforeMount, computed } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import Cookies from 'js-cookie';
 
 const statusOptions = ref([
@@ -27,6 +18,8 @@ const customers = ref([]);
 const orderToAdd = ref({ order_number: null, date: null, status: '', customer: null });
 const orderToEdit = ref({ id: null, order_number: null, date: null, status: '', customer: null });
 
+const orderStats = ref(null);
+
 const groupsById = computed(() => {
   const map = {};
   customers.value.forEach(cat => {
@@ -35,9 +28,14 @@ const groupsById = computed(() => {
   return map;
 });
 
-onBeforeMount(() => {
+onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
 })
+
+async function loadOrderStats() {
+  const response = await axios.get('/api/orders/stats/');
+  orderStats.value = response.data;
+}
 
 async function fetchOrders() {
   loading.value = true;
@@ -82,13 +80,16 @@ async function onOrderEditClick(order) {
 }
 
 async function onLoadClick() {
-  await fetchOrders();
-  await fetchCustomers();
+  loading.value = true;
+  try {
+    await Promise.all([fetchOrders(), fetchCustomers(), loadOrderStats()]);
+  } finally {
+    loading.value = false;
+  }
 }
 
-onBeforeMount(async () => {
-  await fetchOrders();
-  await fetchCustomers();
+onMounted(async () => {
+  await onLoadClick()
 })
 </script>
 
@@ -231,45 +232,63 @@ onBeforeMount(async () => {
       </div>
     </div>
 
-    <div v-for="item in orders" class="order-item card mb-3 shadow-sm">
-      <div class="card-body">
-        <div class="row align-items-center">
-          <div class="col-md-6">
-            <h5 class="card-title text-primary mb-2">Номер заказа: {{ item.order_number }}</h5>
-            <h5 class="card-title text-primary mb-2">{{ item.date }}</h5>
-            <div class="d-flex align-items-center">
-              <span class="badge bg-success me-2">Клиент:</span>
-              <span class="text-muted">{{ groupsById[item.customer]?.name }}</span>
+    
+
+    <div class="container" style="display: flex; gap: 20px">
+      <div class="container">
+        <div v-for="item in orders" class="order-item card mb-3 shadow-sm">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-md-6">
+                <h5 class="card-title text-primary mb-2">Номер заказа: {{ item.order_number }}</h5>
+                <h5 class="card-title text-primary mb-2">{{ item.date }}</h5>
+                <div class="d-flex align-items-center">
+                  <span class="badge bg-success me-2">Клиент:</span>
+                  <span class="text-muted">{{ groupsById[item.customer]?.name }}</span>
+                </div>
+              </div>
+              
+              <div class="col-md-6">
+                <div class="d-flex gap-2 justify-content-end">
+                  <button
+                    class="btn btn-outline-primary btn-lg"
+                    @click="onOrderEditClick(item)"
+                    data-bs-toggle="modal"
+                    data-bs-target="#editOrderModal"
+                    title="Редактировать"
+                  >
+                    <i class="bi bi-pen-fill"></i>
+                  </button>
+                  <button 
+                    class="btn btn-outline-danger btn-lg"
+                    @click="onRemoveClick(item)"
+                    title="Удалить"
+                  >
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-          
-          <div class="col-md-6">
-            <div class="d-flex gap-2 justify-content-end">
-              <button
-                class="btn btn-outline-primary btn-lg"
-                @click="onOrderEditClick(item)"
-                data-bs-toggle="modal"
-                data-bs-target="#editOrderModal"
-                title="Редактировать"
-              >
-                <i class="bi bi-pen-fill"></i>
-              </button>
-              <button 
-                class="btn btn-outline-danger btn-lg"
-                @click="onRemoveClick(item)"
-                title="Удалить"
-              >
-                <i class="bi bi-x-lg"></i>
-              </button>
+            
+            <div v-if="item.status" class="mt-3">
+              <p class="card-text text-muted small">{{ item.status }}</p>
             </div>
           </div>
         </div>
-        
-        <div v-if="item.status" class="mt-3">
-          <p class="card-text text-muted small">{{ item.status }}</p>
+      </div>
+      
+      <div class="stats">
+        <h3>📊 Статистика по заказам</h3>
+        <div class="stats-card">
+          <p><strong>Всего заказов:</strong> <span id="total-orders-count">{{ orderStats?.total_count ?? 'Загрузка...' }}</span></p>
+          <p><strong>Заказов сегодня:</strong> <span id="orders-today">{{ orderStats?.orders_today ?? 'Загрузка...' }}</span></p>
+          <p><strong>Заказов в этом месяце:</strong> 
+            <span id="orders-this-month">{{ orderStats?.orders_this_month ?? 'Загрузка...' }}</span>
+          </p>
         </div>
       </div>
     </div>
+
   </div>
 </template>
 

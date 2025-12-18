@@ -1,15 +1,6 @@
-<!--<template>
-  <ProductList />
-</template>
-
-<script setup>
-import ProductList from '../components/products/ProductList.vue'
-</script>-->
-
-<!-- ProductsComponent.vue -->
 <script setup>
 import axios from "axios";
-import { ref, onBeforeMount, computed } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import Cookies from 'js-cookie';
 
 const loading = ref(false);
@@ -18,6 +9,8 @@ const orders = ref([]);
 const products = ref([]);
 const orderDetailToAdd = ref({ order: null, product: null, quantity: null });
 const orderDetailToEdit = ref({ id: null, order: null, product: null, quantity: null });
+
+const orderDetailStats = ref(null);
 
 const ordersById = computed(() => {
   const map = {};
@@ -35,7 +28,12 @@ const productsById = computed(() => {
   return map;
 });
 
-onBeforeMount(() => {
+async function loadOrderDetailStats() {
+  const response = await axios.get('/api/orderDetails/stats/');
+  orderDetailStats.value = response.data;
+}
+
+onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
 })
 
@@ -91,15 +89,16 @@ async function onOrderDetailEditClick(orderDetail) {
 }
 
 async function onLoadClick() {
-  await fetchOrderDetails();
-  await fetchOrders();
-  await fetchProducts();
+  loading.value = true;
+  try {
+    await Promise.all([fetchOrderDetails(), fetchOrders(), fetchProducts(), loadOrderDetailStats()]);
+  } finally {
+    loading.value = false;
+  }
 }
 
-onBeforeMount(async () => {
-  await fetchOrderDetails();
-  await fetchOrders();
-  await fetchProducts();
+onMounted(async () => {
+  await onLoadClick()
 })
 </script>
 
@@ -221,47 +220,66 @@ onBeforeMount(async () => {
       </div>
     </div>
 
-    <div v-for="item in orderDetails" class="orderDetail-item card mb-3 shadow-sm">
-      <div class="card-body">
-        <div class="row align-items-center">
-          <div class="col-md-6">
-            <h5 class="card-title text-primary mb-2">{{ item.quantity }}</h5>
-            <div class="d-flex align-items-center">
-              <span class="badge bg-success me-2">Заказ:</span>
-              <span class="text-muted">{{ ordersById[item.order]?.date }} - №{{ ordersById[item.order]?.order_number }}</span>
-            </div>
-          </div>
-          
-          <div class="col-md-3">
-            <div class="product-meta">
-              <span class="badge bg-success me-2">Товар:</span>
-              <span class="text-muted">{{ productsById[item.product]?.name }}</span>
-            </div>
-          </div>
-          
-          <div class="col-md-3">
-            <div class="d-flex gap-2 justify-content-end">
-              <button
-                class="btn btn-outline-primary btn-lg"
-                @click="onOrderDetailEditClick(item)"
-                data-bs-toggle="modal"
-                data-bs-target="#editOrderDetailModal"
-                title="Редактировать"
-              >
-                <i class="bi bi-pen-fill"></i>
-              </button>
-              <button 
-                class="btn btn-outline-danger btn-lg"
-                @click="onRemoveClick(item)"
-                title="Удалить"
-              >
-                <i class="bi bi-x-lg"></i>
-              </button>
+    
+
+    <div class="container" style="display: flex; gap: 20px">
+      <div class="container">
+        <div v-for="item in orderDetails" class="orderDetail-item card mb-3 shadow-sm">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-md-6">
+                <h5 class="card-title text-primary mb-2">{{ item.quantity }}</h5>
+                <div class="d-flex align-items-center">
+                  <span class="badge bg-success me-2">Заказ:</span>
+                  <span class="text-muted">{{ ordersById[item.order]?.date }} - №{{ ordersById[item.order]?.order_number }}</span>
+                </div>
+              </div>
+              
+              <div class="col-md-3">
+                <div class="product-meta">
+                  <span class="badge bg-success me-2">Товар:</span>
+                  <span class="text-muted">{{ productsById[item.product]?.name }}</span>
+                </div>
+              </div>
+              
+              <div class="col-md-3">
+                <div class="d-flex gap-2 justify-content-end">
+                  <button
+                    class="btn btn-outline-primary btn-lg"
+                    @click="onOrderDetailEditClick(item)"
+                    data-bs-toggle="modal"
+                    data-bs-target="#editOrderDetailModal"
+                    title="Редактировать"
+                  >
+                    <i class="bi bi-pen-fill"></i>
+                  </button>
+                  <button 
+                    class="btn btn-outline-danger btn-lg"
+                    @click="onRemoveClick(item)"
+                    title="Удалить"
+                  >
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
+      
+      <div class="stats">
+        <h3>📊 Статистика по деталям заказов</h3>
+        <div class="stats-card">
+          <p><strong>Всего позиций:</strong> <span id="total-order-details">{{ orderDetailStats?.total_count ?? 'Загрузка...' }}</span></p>
+          <p><strong>Общее количество:</strong> <span id="total-quantity">{{ orderDetailStats?.total_quantity ?? 'Загрузка...' }}</span></p>
+          <p><strong>Среднее количество:</strong> <span id="avg-quantity">{{ orderDetailStats?.avg_quantity ?? 'Загрузка...' }}</span></p>
+          <p><strong>Минимум/Максимум: </strong> 
+            <span id="quantity-range">{{ orderDetailStats?.min_quantity ?? 'Загрузка...'}} - {{ orderDetailStats?.max_quantity ?? 'Загрузка...'}}</span>
+          </p>
+        </div>
+      </div>
     </div>
+
   </div>
 </template>
 

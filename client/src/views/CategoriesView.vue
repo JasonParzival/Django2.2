@@ -1,14 +1,6 @@
-<!--<template>
-  <ProductList />
-</template>
-
-<script setup>
-import ProductList from '../components/categories/CategoryList.vue'
-</script>-->
-
 <script setup>
 import axios from "axios";
-import { ref, onBeforeMount, computed } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import Cookies from 'js-cookie';
 
 const loading = ref(false);
@@ -16,9 +8,16 @@ const categories = ref([]);
 const categoryToAdd = ref({ name: '', description: '' })
 const categoryToEdit = ref({ id: null, name: '', description: '' })
 
-onBeforeMount(() => {
+const categoryStats = ref(null);
+
+onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
 })
+
+async function loadCategoryStats() {
+  const response = await axios.get('/api/categories/stats/');
+  categoryStats.value = response.data;
+}
 
 async function fetchCategories() {
   loading.value = true
@@ -54,10 +53,16 @@ async function onCategoryEditClick(category) {
 
 async function onLoadClick() {
   await fetchCategories()
+  loading.value = true;
+  try {
+    await Promise.all([fetchCategories(), loadCategoryStats()]);
+  } finally {
+    loading.value = false;
+  }
 }
 
-onBeforeMount(async () => {
-  await fetchCategories()
+onMounted(async () => {
+  await onLoadClick()
 })
 </script>
 
@@ -164,41 +169,59 @@ onBeforeMount(async () => {
       </div>
     </div>
 
-    <div v-for="item in categories" class="сategory-item card mb-3 shadow-sm">
-      <div class="card-body">
-        <div class="row align-items-center">
+    
 
-          <div class="col-md-6">
-            <h5 class="card-title text-primary mb-2">{{ item.name }}</h5>
-          </div>
+    <div class="container" style="display: flex; gap: 20px">
+      <div class="container">
+        <div v-for="item in categories" class="сategory-item card mb-3 shadow-sm">
+          <div class="card-body">
+            <div class="row align-items-center">
+
+              <div class="col-md-6">
+                <h5 class="card-title text-primary mb-2">{{ item.name }}</h5>
+              </div>
+              
+              <div class="col-md-6">
+                <div class="d-flex gap-2 justify-content-end">
+                  <button
+                    class="btn btn-outline-primary btn-lg"
+                    @click="onCategoryEditClick(item)"
+                    data-bs-toggle="modal"
+                    data-bs-target="#editCategoryModal"
+                    title="Редактировать"
+                  >
+                    <i class="bi bi-pen-fill"></i>
+                  </button>
+                  <button 
+                    class="btn btn-outline-danger btn-lg"
+                    @click="onRemoveClick(item)"
+                    title="Удалить"
+                  >
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
           
-          <div class="col-md-6">
-            <div class="d-flex gap-2 justify-content-end">
-              <button
-                class="btn btn-outline-primary btn-lg"
-                @click="onCategoryEditClick(item)"
-                data-bs-toggle="modal"
-                data-bs-target="#editCategoryModal"
-                title="Редактировать"
-              >
-                <i class="bi bi-pen-fill"></i>
-              </button>
-              <button 
-                class="btn btn-outline-danger btn-lg"
-                @click="onRemoveClick(item)"
-                title="Удалить"
-              >
-                <i class="bi bi-x-lg"></i>
-              </button>
+            <div v-if="item.description" class="mt-3">
+              <p class="card-text text-muted small">{{ item.description }}</p>
             </div>
           </div>
         </div>
-        
-        <div v-if="item.description" class="mt-3">
-          <p class="card-text text-muted small">{{ item.description }}</p>
+      </div>
+      
+      <div class="stats">
+        <h3>📊 Статистика по категориям</h3>
+        <div class="stats-card">
+          <p><strong>Всего категорий:</strong> <span id="total-categories">{{ categoryStats?.total_count ?? 'Загрузка...' }}</span></p>
+          <p><strong>Всего товаров:</strong> <span id="total-products-all">{{ categoryStats?.total_products ?? 'Загрузка...'}}</span></p>
+          <p><strong>Среднее в категории: </strong> 
+            <span id="avg-per-category">{{ categoryStats?.avg_products_per_category ?? 'Загрузка...'}}</span>
+          </p>
         </div>
       </div>
     </div>
+
   </div>
 </template>
 

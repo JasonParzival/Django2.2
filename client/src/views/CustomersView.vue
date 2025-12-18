@@ -1,14 +1,6 @@
-<!--<template>
-  <ProductList />
-</template>
-
-<script setup>
-import ProductList from '../components/customers/CustomerList.vue'
-</script>-->
-
 <script setup>
 import axios, { Axios } from "axios";
-import { ref, onBeforeMount, computed } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import Cookies from 'js-cookie';
 
 const loading = ref(false);
@@ -18,11 +10,18 @@ const customerToEdit = ref({ id: null, name: '', address: '', phone_number: '', 
 const customersPictureRef = ref();
 const customersAddImageUrl = ref();
 
+const customerStats = ref(null);
+
 const imageModalUrl = ref("")
 
-onBeforeMount(() => {
+onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
 })
+
+async function loadCustomerStats() {
+  const response = await axios.get('/api/customers/stats/');
+  customerStats.value = response.data;
+}
 
 async function fetchCustomers() {
   loading.value = true;
@@ -99,10 +98,16 @@ async function onCustomerEditClick(customer) {
 
 async function onLoadClick() {
   await fetchCustomers()
+  loading.value = true;
+  try {
+    await Promise.all([await fetchCustomers(), loadCustomerStats()]);
+  } finally {
+    loading.value = false;
+  }
 }
 
-onBeforeMount(async () => {
-  await fetchCustomers()
+onMounted(async () => {
+  await onLoadClick()
 })
 
 function openImageModal(imageUrl) {
@@ -303,59 +308,80 @@ function openImageModal(imageUrl) {
       </div>
     </div>
 
-    <div v-for="item in customers" class="customer-item card mb-3 shadow-sm">
-      <div class="card-body">
-        <div class="row align-items-center">
-          <div class="col-md-6">
-            <h5 class="card-title text-primary mb-2">{{ item.name }}</h5>
-          </div>
-          
-          <div class="col-md-2">
-            <div class="product-meta">
-              <small class="text-muted d-block">Адрес: {{ item.address }}</small>
-              <small class="text-muted d-block">Номер телефона: {{ item.phone_number }}</small>
-            </div>
-          </div>
+    
 
-          <div class="col-md-2">
-            <div v-show="item.picture">
-              <img :src="item.picture" 
-              data-bs-toggle="modal"
-              data-bs-target="#imageModal"
-              @click="openImageModal(item.picture)"
-              style="max-height: 60px; cursor: pointer;" 
-              alt=""
-              ></img>
+    <div class="container" style="display: flex; gap: 20px">
+      <div class="container">
+        <div v-for="item in customers" class="customer-item card mb-3 shadow-sm">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-md-6">
+                <h5 class="card-title text-primary mb-2">{{ item.name }}</h5>
+              </div>
+              
+              <div class="col-md-2">
+                <div class="product-meta">
+                  <small class="text-muted d-block">Адрес: {{ item.address }}</small>
+                  <small class="text-muted d-block">Номер телефона: {{ item.phone_number }}</small>
+                </div>
+              </div>
+
+              <div class="col-md-2">
+                <div v-show="item.picture">
+                  <img :src="item.picture" 
+                  data-bs-toggle="modal"
+                  data-bs-target="#imageModal"
+                  @click="openImageModal(item.picture)"
+                  style="max-height: 60px; cursor: pointer;" 
+                  alt=""
+                  ></img>
+                </div>
+              </div>
+              
+              <div class="col-md-2">
+                <div class="d-flex gap-2 justify-content-end">
+                  <button
+                    class="btn btn-outline-primary btn-lg"
+                    @click="onCustomerEditClick(item)"
+                    data-bs-toggle="modal"
+                    data-bs-target="#editCustomerModal"
+                    title="Редактировать"
+                  >
+                    <i class="bi bi-pen-fill"></i>
+                  </button>
+                  <button 
+                    class="btn btn-outline-danger btn-lg"
+                    @click="onRemoveClick(item)"
+                    title="Удалить"
+                  >
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-          
-          <div class="col-md-2">
-            <div class="d-flex gap-2 justify-content-end">
-              <button
-                class="btn btn-outline-primary btn-lg"
-                @click="onCustomerEditClick(item)"
-                data-bs-toggle="modal"
-                data-bs-target="#editCustomerModal"
-                title="Редактировать"
-              >
-                <i class="bi bi-pen-fill"></i>
-              </button>
-              <button 
-                class="btn btn-outline-danger btn-lg"
-                @click="onRemoveClick(item)"
-                title="Удалить"
-              >
-                <i class="bi bi-x-lg"></i>
-              </button>
+            
+            <div v-if="item.email" class="mt-3">
+              <p class="card-text text-muted small">{{ item.email }}</p>
             </div>
           </div>
         </div>
-        
-        <div v-if="item.email" class="mt-3">
-          <p class="card-text text-muted small">{{ item.email }}</p>
+      </div>
+      
+      <div class="stats">
+        <h3>📊 Статистика по клиентам</h3>
+        <div class="stats-card">
+          <p><strong>Всего клиентов:</strong> <span id="total-customers">{{ customerStats?.total_count ?? 'Загрузка...' }}</span></p>
+          <p><strong>Клиентов с заказами: </strong> 
+            <span id="customers-with-orders">{{ customerStats?.customers_with_orders ?? 'Загрузка...' }}</span>
+          </p>
+          <p><strong>Всего заказов:</strong> <span id="total-orders">{{ customerStats?.total_orders ?? 'Загрузка...' }}</span></p>
+          <p><strong>Среднее заказов: </strong> 
+            <span id="avg-orders-per-customer">{{ customerStats?.avg_orders_per_customer ?? 'Загрузка...' }}</span>
+          </p>
         </div>
       </div>
     </div>
+
   </div>
 </template>
 

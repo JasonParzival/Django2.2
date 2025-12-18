@@ -1,15 +1,6 @@
-<!--<template>
-  <ProductList />
-</template>
-
-<script setup>
-import ProductList from '../components/products/ProductList.vue'
-</script>-->
-
-<!-- ProductsComponent.vue -->
 <script setup>
 import axios from "axios";
-import { ref, onBeforeMount, computed } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import Cookies from 'js-cookie';
 
 const loading = ref(false);
@@ -19,6 +10,8 @@ const productToAdd = ref({ name: '', price: null, description: '', quantity: nul
 const productToEdit = ref({ id: null, name: '', price: null, description: '', quantity: null, category: null });
 const productsPictureRef = ref();
 const productsAddImageUrl = ref();
+
+const productStats = ref(null);
 
 const imageModalUrl = ref("")
 
@@ -30,9 +23,14 @@ const groupsById = computed(() => {
   return map;
 });
 
-onBeforeMount(() => {
+onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
 })
+
+async function loadProductStats() {
+  const response = await axios.get('/api/products/stats/');
+  productStats.value = response.data;
+}
 
 async function fetchProducts() {
   loading.value = true;
@@ -121,13 +119,16 @@ async function onProductEditClick(product) {
 }
 
 async function onLoadClick() {
-  await fetchProducts()
-  await fetchCategories()
+  loading.value = true;
+  try {
+    await Promise.all([fetchProducts(), fetchCategories(), loadProductStats()]);
+  } finally {
+    loading.value = false;
+  }
 }
 
-onBeforeMount(async () => {
-  await fetchProducts()
-  await fetchCategories()
+onMounted(async () => {
+  await onLoadClick()
 })
 
 function openImageModal(imageUrl) {
@@ -347,63 +348,84 @@ function openImageModal(imageUrl) {
       </div>
     </div>
 
-    <div v-for="item in products" class="product-item card mb-3 shadow-sm">
-      <div class="card-body">
-        <div class="row align-items-center">
-          <div class="col-md-6">
-            <h5 class="card-title text-primary mb-2">{{ item.name }}</h5>
-            <div class="d-flex align-items-center">
-              <span class="badge bg-success me-2">Категория:</span>
-              <span class="text-muted">{{ groupsById[item.category]?.name }}</span>
-            </div>
-          </div>
-          
-          <div class="col-md-2">
-            <div class="product-meta">
-              <small class="text-muted d-block">Цена: {{ item.price }} ₽</small>
-              <small class="text-muted d-block">В наличии: {{ item.quantity }} шт.</small>
-            </div>
-          </div>
+    
 
-          <div class="col-md-2">
-            <div v-show="item.picture">
-              <img :src="item.picture" 
-              data-bs-toggle="modal"
-              data-bs-target="#imageModal"
-              @click="openImageModal(item.picture)"
-              style="max-height: 60px; cursor: pointer;" 
-              alt=""
-              ></img>
+    <div class="container" style="display: flex; gap: 20px">
+      <div class="container">
+        <div v-for="item in products" class="product-item card mb-3 shadow-sm">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-md-6">
+                <h5 class="card-title text-primary mb-2">{{ item.name }}</h5>
+                <div class="d-flex align-items-center">
+                  <span class="badge bg-success me-2">Категория:</span>
+                  <span class="text-muted">{{ groupsById[item.category]?.name }}</span>
+                </div>
+              </div>
+              
+              <div class="col-md-2">
+                <div class="product-meta">
+                  <small class="text-muted d-block">Цена: {{ item.price }} ₽</small>
+                  <small class="text-muted d-block">В наличии: {{ item.quantity }} шт.</small>
+                </div>
+              </div>
+
+              <div class="col-md-2">
+                <div v-show="item.picture">
+                  <img :src="item.picture" 
+                  data-bs-toggle="modal"
+                  data-bs-target="#imageModal"
+                  @click="openImageModal(item.picture)"
+                  style="max-height: 60px; cursor: pointer;" 
+                  alt=""
+                  ></img>
+                </div>
+              </div>
+              
+              <div class="col-md-2">
+                <div class="d-flex gap-2 justify-content-end">
+                  <button
+                    class="btn btn-outline-primary btn-lg"
+                    @click="onProductEditClick(item)"
+                    data-bs-toggle="modal"
+                    data-bs-target="#editProductModal"
+                    title="Редактировать"
+                  >
+                    <i class="bi bi-pen-fill"></i>
+                  </button>
+                  <button 
+                    class="btn btn-outline-danger btn-lg"
+                    @click="onRemoveClick(item)"
+                    title="Удалить"
+                  >
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-          
-          <div class="col-md-2">
-            <div class="d-flex gap-2 justify-content-end">
-              <button
-                class="btn btn-outline-primary btn-lg"
-                @click="onProductEditClick(item)"
-                data-bs-toggle="modal"
-                data-bs-target="#editProductModal"
-                title="Редактировать"
-              >
-                <i class="bi bi-pen-fill"></i>
-              </button>
-              <button 
-                class="btn btn-outline-danger btn-lg"
-                @click="onRemoveClick(item)"
-                title="Удалить"
-              >
-                <i class="bi bi-x-lg"></i>
-              </button>
+            
+            <div v-if="item.description" class="mt-3">
+              <p class="card-text text-muted small">{{ item.description }}</p>
             </div>
           </div>
         </div>
-        
-        <div v-if="item.description" class="mt-3">
-          <p class="card-text text-muted small">{{ item.description }}</p>
+      </div>
+      
+      <div class="stats">
+        <h3>📊 Статистика по товарам</h3>
+        <div class="stats-card">
+          <p><strong>Всего товаров:</strong> <span id="total-products">{{ productStats?.total_count ?? 'Загрузка...' }}</span></p>
+          <p><strong>Средняя цена:</strong> <span id="avg-price">{{ productStats?.avg_price ? productStats.avg_price + ' ₽' : 'Загрузка...' }}</span></p>
+          <p><strong>Общий запас:</strong> <span id="total-stock">{{ productStats?.total_stock ?? 'Загрузка...' }}</span></p>
+          <p><strong>Ценовой диапазон:</strong> 
+            <span id="price-range">{{ productStats?.min_price && productStats?.max_price 
+               ? productStats.min_price + ' - ' + productStats.max_price + ' ₽' 
+               : 'Загрузка...' }}</span>
+          </p>
         </div>
       </div>
     </div>
+
   </div>
 </template>
 
