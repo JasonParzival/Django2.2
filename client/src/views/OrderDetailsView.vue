@@ -33,9 +33,9 @@ async function loadOrderDetailStats() {
   orderDetailStats.value = response.data;
 }
 
-onMounted(() => {
+/*onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
-})
+})*/
 
 async function fetchOrderDetails() {
   loading.value = true;
@@ -62,26 +62,42 @@ async function fetchProducts() {
 }
 
 async function onOrderDetailAdd() {
-  await axios.post("/api/orderDetails/", {
-    ...orderDetailToAdd.value,
-  });
-  await fetchOrderDetails();
-  await fetchOrders();
-  await fetchProducts();
-  // Сброс формы
-  orderDetailToAdd.value = { order: null, product: null, quantity: null };
+  try {
+    await axios.post("/api/orderDetails/", {
+      ...orderDetailToAdd.value,
+    });
+    await fetchOrderDetails();
+    await fetchOrders();
+    await fetchProducts();
+    orderDetailToAdd.value = { order: null, product: null, quantity: null };
+  } catch (error) {
+    console.error('Error details:', error.response.data);
+    alert('Ошибка при добавлении детали заказа: ' + JSON.stringify(error.response.data));
+  }
 }
 
 async function onUpdateOrderDetail() {
-  await axios.put(`/api/orderDetails/${orderDetailToEdit.value.id}/`, {
-    ...orderDetailToEdit.value,
-  });
-  await fetchOrderDetails();
+  try {
+    await axios.put(`/api/orderDetails/${orderDetailToEdit.value.id}/`, {
+      ...orderDetailToEdit.value,
+    });
+    await fetchOrderDetails();
+  } catch (error) {
+    console.error('Error details:', error.response.data);
+    alert('Ошибка при обновлении детали заказа: ' + JSON.stringify(error.response.data));
+  }
 }
 
 async function onRemoveClick(orderDetail) {
-  await axios.delete(`/api/orderDetails/${orderDetail.id}/`);
-  await fetchOrderDetails(); 
+  if (confirm(`Удалить позицию с количеством ${orderDetail.quantity}?`)) {
+    try {
+      await axios.delete(`/api/orderDetails/${orderDetail.id}/`);
+      await fetchOrderDetails();
+    } catch (error) {
+      console.error('Error details:', error.response.data);
+      alert('Ошибка при удалении детали заказа: ' + JSON.stringify(error.response.data));
+    }
+  }
 }
 
 async function onOrderDetailEditClick(orderDetail) {

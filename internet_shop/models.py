@@ -1,5 +1,7 @@
 from django.db import models
 
+from django.contrib.auth.models import User
+
 # Create your models here.
 class Product(models.Model):
     name = models.TextField("Название")
@@ -9,7 +11,7 @@ class Product(models.Model):
     category = models.ForeignKey("Category", on_delete=models.CASCADE, null=True, verbose_name="Категория")
     # добавим ImageField, в upload_to указываем папку куда загружать файл
     picture = models.ImageField("Изображение", null=True, upload_to="products")
-    #user = models.ForeignKey("auth.User", verbose_name="Пользователь", on_delete=models.CASCADE, null=True)
+    user = models.ForeignKey(User, verbose_name="Пользователь", on_delete=models.CASCADE, null=True) 
     
     class Meta:
         verbose_name = "Товар"
@@ -22,6 +24,7 @@ class Product(models.Model):
 class Category(models.Model):
     name = models.TextField("Название")
     description = models.TextField("Описание")
+    user = models.ForeignKey(User, verbose_name="Пользователь", on_delete=models.CASCADE, null=True)
     
     class Meta:
         verbose_name = "Категория товара"
@@ -36,6 +39,8 @@ class Customer(models.Model):
     phone_number = models.TextField("Номер телефона")
     email = models.TextField("Электронная почта")
     picture = models.ImageField("Изображение", null=True, upload_to="customers")
+    
+    user = models.ForeignKey(User, verbose_name="Пользователь", on_delete=models.CASCADE, null=True)
     
     class Meta:
         verbose_name = "Клиент"
@@ -57,6 +62,7 @@ class Order(models.Model):
     ], 
     default='В обработке' )
     customer = models.ForeignKey("Customer", on_delete=models.CASCADE, null=True, verbose_name="Клиент")
+    user = models.ForeignKey(User, verbose_name="Пользователь", on_delete=models.CASCADE, null=True) 
     
     class Meta:
         verbose_name = "Заказ"
@@ -69,6 +75,7 @@ class OrderDetail(models.Model):
     order = models.ForeignKey("Order", on_delete=models.CASCADE, null=True, verbose_name="Заказ")
     product = models.ForeignKey("Product", on_delete=models.CASCADE, null=True, verbose_name="Продукт")
     quantity = models.IntegerField("Количество")
+    user = models.ForeignKey(User, verbose_name="Пользователь", on_delete=models.CASCADE, null=True) 
     
     class Meta:
         verbose_name = "Детали заказа"

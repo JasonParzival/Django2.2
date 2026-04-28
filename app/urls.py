@@ -24,11 +24,15 @@ from django.conf.urls.static import static
 
 from rest_framework.routers import DefaultRouter
 
+from rest_framework.authtoken.views import obtain_auth_token
+
 from internet_shop.api import ProductsViewset
 from internet_shop.api import CategoriesViewset
 from internet_shop.api import CustomersViewset
 from internet_shop.api import OrdersViewset
 from internet_shop.api import OrderDetailsViewset
+
+from internet_shop.auth_views import RegisterView, LoginView 
 
 router = DefaultRouter()
 router.register("products", ProductsViewset, basename="product")
@@ -41,4 +45,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.ShowProductsView.as_view()),
     path('api/', include(router.urls)),
+    path('api/register/', RegisterView.as_view(), name='register'),
+    path('api/login/', LoginView.as_view(), name='login'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

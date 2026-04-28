@@ -28,9 +28,9 @@ const groupsById = computed(() => {
   return map;
 });
 
-onMounted(() => {
+/*onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
-})
+})*/
 
 async function loadOrderStats() {
   const response = await axios.get('/api/orders/stats/');
@@ -54,25 +54,41 @@ async function fetchCustomers() {
 }
 
 async function onOrderAdd() {
-  await axios.post("/api/orders/", {
-    ...orderToAdd.value,
-  });
-  await fetchOrders();
-  await fetchCustomers();
-  // Сброс формы
-  orderToAdd.value = { order_number: null, date: null, status: '', customer: null };
+  try {
+    await axios.post("/api/orders/", {
+      ...orderToAdd.value,
+    });
+    await fetchOrders();
+    await fetchCustomers();
+    orderToAdd.value = { order_number: null, date: null, status: '', customer: null };
+  } catch (error) {
+    console.error('Error details:', error.response.data);
+    alert('Ошибка при добавлении заказа: ' + JSON.stringify(error.response.data));
+  }
 }
 
 async function onUpdateOrder() {
-  await axios.put(`/api/orders/${orderToEdit.value.id}/`, {
-    ...orderToEdit.value,
-  });
-  await fetchOrders();
+  try {
+    await axios.put(`/api/orders/${orderToEdit.value.id}/`, {
+      ...orderToEdit.value,
+    });
+    await fetchOrders();
+  } catch (error) {
+    console.error('Error details:', error.response.data);
+    alert('Ошибка при обновлении заказа: ' + JSON.stringify(error.response.data));
+  }
 }
 
 async function onRemoveClick(order) {
-  await axios.delete(`/api/orders/${order.id}/`);
-  await fetchOrders(); 
+  if (confirm(`Удалить заказ №${order.order_number}?`)) {
+    try {
+      await axios.delete(`/api/orders/${order.id}/`);
+      await fetchOrders();
+    } catch (error) {
+      console.error('Error details:', error.response.data);
+      alert('Ошибка при удалении заказа: ' + JSON.stringify(error.response.data));
+    }
+  }
 }
 
 async function onOrderEditClick(order) {

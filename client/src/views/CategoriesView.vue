@@ -10,9 +10,9 @@ const categoryToEdit = ref({ id: null, name: '', description: '' })
 
 const categoryStats = ref(null);
 
-onMounted(() => {
+/*onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
-})
+})*/
 
 async function loadCategoryStats() {
   const response = await axios.get('/api/categories/stats/');
@@ -27,24 +27,40 @@ async function fetchCategories() {
 }
 
 async function onCategoryAdd() {
-  await axios.post("/api/categories/", {
-    ...categoryToAdd.value,
-  });
-  await fetchCategories();
-  // Сброс формы
-  categoryToAdd.value = { name: '', description: '' };
+  try {
+    await axios.post("/api/categories/", {
+      ...categoryToAdd.value,
+    });
+    await fetchCategories();
+    categoryToAdd.value = { name: '', description: '' };
+  } catch (error) {
+    console.error('Error details:', error.response.data);
+    alert('Ошибка при добавлении категории: ' + JSON.stringify(error.response.data));
+  }
 }
 
 async function onUpdateCategory() {
-  await axios.put(`/api/categories/${categoryToEdit.value.id}/`, {
-    ...categoryToEdit.value,
-  });
-  await fetchCategories();
+  try {
+    await axios.put(`/api/categories/${categoryToEdit.value.id}/`, {
+      ...categoryToEdit.value,
+    });
+    await fetchCategories();
+  } catch (error) {
+    console.error('Error details:', error.response.data);
+    alert('Ошибка при обновлении категории: ' + JSON.stringify(error.response.data));
+  }
 }
 
 async function onRemoveClick(category) {
-  await axios.delete(`/api/categories/${category.id}/`);
-  await fetchCategories(); 
+  if (confirm(`Удалить категорию "${category.name}"?`)) {
+    try {
+      await axios.delete(`/api/categories/${category.id}/`);
+      await fetchCategories();
+    } catch (error) {
+      console.error('Error details:', error.response.data);
+      alert('Ошибка при удалении категории: ' + JSON.stringify(error.response.data));
+    }
+  }
 }
 
 async function onCategoryEditClick(category) {

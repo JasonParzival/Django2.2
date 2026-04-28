@@ -23,9 +23,9 @@ const groupsById = computed(() => {
   return map;
 });
 
-onMounted(() => {
+/*onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
-})
+})*/
 
 async function loadProductStats() {
   const response = await axios.get('/api/products/stats/');
@@ -52,7 +52,7 @@ async function productsAddPictureChange() {
   productsAddImageUrl.value = URL.createObjectURL(productsPictureRef.value.files[0])
 }
 
-async function onProductAdd() {
+/*async function onProductAdd() {
   const formData = new FormData();
 
   // вытаскиваем выбранный файл с формы через studentsPictureRef.value.files
@@ -78,40 +78,79 @@ async function onProductAdd() {
     ...productToAdd.value,
   });
   await fetchProducts();
-  await fetchCategories();*/
+  await fetchCategories();*//*
   // Сброс формы
   productToAdd.value = { name: '', price: null, description: '', quantity: null, category: null };
+}*/
+
+async function onProductAdd() {
+  const formData = new FormData();
+
+  if (productsPictureRef.value.files[0]) {
+    formData.append('picture', productsPictureRef.value.files[0]);
+  }
+
+  formData.set('name', productToAdd.value.name)
+  formData.set('price', productToAdd.value.price)
+  formData.set('description', productToAdd.value.description)
+  formData.set('quantity', productToAdd.value.quantity)
+  formData.set('category', productToAdd.value.category)
+
+  try {
+    const response = await axios.post("/api/products/", formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    });
+    await fetchProducts();
+    await fetchCategories();
+    productToAdd.value = { name: '', price: null, description: '', quantity: null, category: null };
+    productsPictureRef.value.value = '';
+    productsAddImageUrl.value = ''; 
+  } catch (error) {
+    console.error('Error details:', error.response.data);
+    alert('Ошибка при добавлении товара: ' + JSON.stringify(error.response.data));
+  }
 }
 
 async function onUpdateProduct() {
   const formData = new FormData();
 
-  // вытаскиваем выбранный файл с формы через studentsPictureRef.value.files
-  formData.append('picture', productsPictureRef.value.files[0]);
+  if (productsPictureRef.value.files[0]) {
+    formData.append('picture', productsPictureRef.value.files[0]);
+  }
 
-  // явно привязываем поля из studentToEdit
   formData.set('name', productToEdit.value.name)
   formData.set('price', productToEdit.value.price)
   formData.set('description', productToEdit.value.description)
   formData.set('quantity', productToEdit.value.quantity)
   formData.set('category', productToEdit.value.category)
 
-  // ну и тут указываем в заголовке что отправляем данные с файлом
-  await axios.put(`/api/products/${productToEdit.value.id}/`, formData, {
-      headers: {
-          'Content-Type': 'multipart/form-data'
-      }
-  });
-
-  /*await axios.put(`/api/products/${productToEdit.value.id}/`, {
-    ...productToEdit.value,
-  });*/
-  await fetchProducts();
+  try {
+    await axios.put(`/api/products/${productToEdit.value.id}/`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    });
+    await fetchProducts();
+    productsPictureRef.value.value = '';
+    productsAddImageUrl.value = '';
+  } catch (error) {
+    console.error('Error details:', error.response.data);
+    alert('Ошибка при обновлении товара: ' + JSON.stringify(error.response.data));
+  }
 }
 
 async function onRemoveClick(product) {
-  await axios.delete(`/api/products/${product.id}/`);
-  await fetchProducts(); 
+  if (confirm(`Удалить товар "${product.name}"?`)) {
+    try {
+      await axios.delete(`/api/products/${product.id}/`);
+      await fetchProducts();
+    } catch (error) {
+      console.error('Error details:', error.response.data);
+      alert('Ошибка при удалении товара: ' + JSON.stringify(error.response.data));
+    }
+  }
 }
 
 async function onProductEditClick(product) {

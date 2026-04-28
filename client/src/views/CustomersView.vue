@@ -14,9 +14,9 @@ const customerStats = ref(null);
 
 const imageModalUrl = ref("")
 
-onMounted(() => {
+/*onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
-})
+})*/
 
 async function loadCustomerStats() {
   const response = await axios.get('/api/customers/stats/');
@@ -37,8 +37,10 @@ async function customersAddPictureChange() {
 async function onCustomerAdd() {
   const formData = new FormData();
 
-  // вытаскиваем выбранный файл с формы через studentsPictureRef.value.files
-  formData.append('picture', customersPictureRef.value.files[0]);
+  // проверяем, выбран ли файл перед добавлением
+  if (customersPictureRef.value.files[0]) {
+    formData.append('picture', customersPictureRef.value.files[0]);
+  }
 
   // явно привязываем поля из customerToAdd
   formData.set('name', customerToAdd.value.name)
@@ -46,50 +48,62 @@ async function onCustomerAdd() {
   formData.set('phone_number', customerToAdd.value.phone_number)
   formData.set('email', customerToAdd.value.email)
 
-  // ну и тут указываем в заголовке что отправляем данные с файлом
-  await axios.post("/api/customers/", formData, {
-      headers: {
-          'Content-Type': 'multipart/form-data'
-      }
-  });
-  await fetchCustomers();
-
-  /*await axios.post("/api/customers/", {
-    ...customerToAdd.value,
-  });
-  await fetchCustomers();*/
-  // Сброс формы
-  customerToAdd.value = { name: '', address: '', phone_number: '', email: '' };
+  try {
+    // ну и тут указываем в заголовке что отправляем данные с файлом
+    await axios.post("/api/customers/", formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    });
+    await fetchCustomers();
+    
+    // Сброс формы
+    customerToAdd.value = { name: '', address: '', phone_number: '', email: '' };
+    customersPictureRef.value.value = ''; // очищаем input file
+    customersAddImageUrl.value = ''; // очищаем превью
+  } catch (error) {
+    console.error('Error details:', error.response.data);
+    alert('Ошибка при добавлении клиента: ' + JSON.stringify(error.response.data));
+  }
 }
 
 async function onUpdateCustomer() {
   const formData = new FormData();
 
-  // вытаскиваем выбранный файл с формы через studentsPictureRef.value.files
-  formData.append('picture', customersPictureRef.value.files[0]);
+  // проверяем, выбран ли файл перед добавлением
+  if (customersPictureRef.value.files[0]) {
+    formData.append('picture', customersPictureRef.value.files[0]);
+  }
 
-  // явно привязываем поля из studentToEdit
+  // явно привязываем поля из customerToEdit
   formData.set('name', customerToEdit.value.name)
   formData.set('address', customerToEdit.value.address)
   formData.set('phone_number', customerToEdit.value.phone_number)
   formData.set('email', customerToEdit.value.email)
 
-  // ну и тут указываем в заголовке что отправляем данные с файлом
-  await axios.put(`/api/customers/${customerToEdit.value.id}/`, formData, {
-      headers: {
-          'Content-Type': 'multipart/form-data'
-      }
-  });
-
-  /*await axios.put(`/api/customers/${customerToEdit.value.id}/`, {
-    ...сustomerToEdit.value,
-  });*/
-  await fetchCustomers();
+  try {
+    await axios.put(`/api/customers/${customerToEdit.value.id}/`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    });
+    await fetchCustomers();
+  } catch (error) {
+    console.error('Error details:', error.response.data);
+    alert('Ошибка при обновлении клиента: ' + JSON.stringify(error.response.data));
+  }
 }
 
 async function onRemoveClick(customer) {
-  await axios.delete(`/api/customers/${customer.id}/`);
-  await fetchCustomers(); 
+  if (confirm(`Удалить клиента "${customer.name}"?`)) {
+    try {
+      await axios.delete(`/api/customers/${customer.id}/`);
+      await fetchCustomers();
+    } catch (error) {
+      console.error('Error details:', error.response.data);
+      alert('Ошибка при удалении клиента: ' + JSON.stringify(error.response.data));
+    }
+  }
 }
 
 async function onCustomerEditClick(customer) {
