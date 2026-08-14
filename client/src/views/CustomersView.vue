@@ -2,6 +2,9 @@
 import axios, { Axios } from "axios";
 import { ref, onMounted, computed } from 'vue';
 import Cookies from 'js-cookie';
+import UserFilter from '../components/UserFilter.vue'
+
+const filterUserId = ref('')
 
 const loading = ref(false);
 const customers = ref([]);
@@ -25,9 +28,18 @@ async function loadCustomerStats() {
 
 async function fetchCustomers() {
   loading.value = true;
-  const r = await axios.get("/api/customers/");
+  const url = filterUserId.value 
+    ? `/api/customers/?user_id=${filterUserId.value}` 
+    : '/api/customers/';
+  const r = await axios.get(url);
   customers.value = r.data;
   loading.value = false;
+}
+
+function onFilterChange(userId) {
+  filterUserId.value = userId;
+  fetchCustomers();     
+  loadCustomerStats();   
 }
 
 async function customersAddPictureChange() {
@@ -145,6 +157,7 @@ function openImageModal(imageUrl) {
   </div>
 
   <div class="container my-5">
+    <UserFilter @filter-change="onFilterChange" />
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1>Клиенты</h1>
       <button @click="onLoadClick" class="btn btn-outline-primary">

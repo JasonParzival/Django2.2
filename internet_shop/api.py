@@ -22,6 +22,22 @@ from internet_shop.serializers import OrderSerializer
 from internet_shop.models import OrderDetail
 from internet_shop.serializers import OrderDetailSerializer
 
+from internet_shop.serializers import UserSerializer
+from django.contrib.auth.models import User
+
+class UsersViewset(
+    mixins.ListModelMixin,
+    GenericViewSet
+):
+    permission_classes = [IsAuthenticated]
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return super().get_queryset()
+        return User.objects.none()
+
 class ProductsViewset(
     mixins.UpdateModelMixin,
     mixins.CreateModelMixin,
@@ -39,6 +55,9 @@ class ProductsViewset(
         qs = super().get_queryset()
         
         if self.request.user.is_superuser:
+            user_id = self.request.query_params.get('user_id')
+            if user_id:
+                qs = qs.filter(user_id=user_id)
             return qs
         
         qs = qs.filter(user=self.request.user) 
@@ -86,6 +105,9 @@ class CategoriesViewset(
         qs = super().get_queryset()
         
         if self.request.user.is_superuser:
+            user_id = self.request.query_params.get('user_id')
+            if user_id:
+                qs = qs.filter(user_id=user_id)
             return qs
         
         qs = qs.filter(user=self.request.user)
@@ -142,6 +164,9 @@ class CustomersViewset(
         qs = super().get_queryset()
         
         if self.request.user.is_superuser:
+            user_id = self.request.query_params.get('user_id')
+            if user_id:
+                qs = qs.filter(user_id=user_id)
             return qs
         
         qs = qs.filter(user=self.request.user)
@@ -198,6 +223,9 @@ class OrdersViewset(
         qs = super().get_queryset()
         
         if self.request.user.is_superuser:
+            user_id = self.request.query_params.get('user_id')
+            if user_id:
+                qs = qs.filter(user_id=user_id)
             return qs
         
         qs = qs.filter(user=self.request.user)
@@ -262,6 +290,9 @@ class OrderDetailsViewset(
         qs = super().get_queryset()
         
         if self.request.user.is_superuser:
+            user_id = self.request.query_params.get('user_id')
+            if user_id:
+                qs = qs.filter(user_id=user_id)
             return qs
         
         qs = qs.filter(user=self.request.user)

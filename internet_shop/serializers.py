@@ -6,6 +6,13 @@ from internet_shop.models import Customer
 from internet_shop.models import Order
 from internet_shop.models import OrderDetail
 
+from django.contrib.auth.models import User
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'first_name', 'last_name', 'email']
+
 # №2
 class CategorySerializer(serializers.ModelSerializer):
     def create(self, validated_data):

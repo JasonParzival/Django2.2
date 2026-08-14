@@ -2,6 +2,9 @@
 import axios from "axios";
 import { ref, onMounted, computed } from 'vue';
 import Cookies from 'js-cookie';
+import UserFilter from '../components/UserFilter.vue'
+
+const filterUserId = ref('')
 
 const loading = ref(false);
 const products = ref([]);
@@ -34,10 +37,19 @@ async function loadProductStats() {
 
 async function fetchProducts() {
   loading.value = true;
-  const r = await axios.get("/api/products/");
+  const url = filterUserId.value 
+    ? `/api/products/?user_id=${filterUserId.value}` 
+    : '/api/products/';
+  const r = await axios.get(url);
   console.log(r.data)
   products.value = r.data;
   loading.value = false;
+}
+
+function onFilterChange(userId) {
+  filterUserId.value = userId;
+  fetchProducts();     
+  loadProductStats();   
 }
 
 async function fetchCategories() {
@@ -191,6 +203,7 @@ function openImageModal(imageUrl) {
   </div>
 
   <div class="container my-5">
+    <UserFilter @filter-change="onFilterChange" />
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1>Товары</h1>
       <button @click="onLoadClick" class="btn btn-outline-primary">
@@ -401,7 +414,7 @@ function openImageModal(imageUrl) {
                   <span class="text-muted">{{ groupsById[item.category]?.name }}</span>
                 </div>
               </div>
-              
+
               <div class="col-md-2">
                 <div class="product-meta">
                   <small class="text-muted d-block">Цена: {{ item.price }} ₽</small>

@@ -2,6 +2,9 @@
 import axios from "axios";
 import { ref, onMounted, computed } from 'vue';
 import Cookies from 'js-cookie';
+import UserFilter from '../components/UserFilter.vue'
+
+const filterUserId = ref('')
 
 const loading = ref(false);
 const orderDetails = ref([]);
@@ -39,10 +42,19 @@ async function loadOrderDetailStats() {
 
 async function fetchOrderDetails() {
   loading.value = true;
-  const r = await axios.get("/api/orderDetails/");
+  const url = filterUserId.value 
+    ? `/api/orderDetails/?user_id=${filterUserId.value}` 
+    : '/api/orderDetails/';
+  const r = await axios.get(url);
   console.log(r.data)
   orderDetails.value = r.data;
   loading.value = false;
+}
+
+function onFilterChange(userId) {
+  filterUserId.value = userId;
+  fetchOrderDetails();      
+  loadOrderDetailStats();   
 }
 
 async function fetchOrders() {
@@ -120,6 +132,7 @@ onMounted(async () => {
 
 <template>
   <div class="container my-5">
+    <UserFilter @filter-change="onFilterChange" />
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1>Детали заказа</h1>
       <button @click="onLoadClick" class="btn btn-outline-primary">

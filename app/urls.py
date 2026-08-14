@@ -31,6 +31,7 @@ from internet_shop.api import CategoriesViewset
 from internet_shop.api import CustomersViewset
 from internet_shop.api import OrdersViewset
 from internet_shop.api import OrderDetailsViewset
+from internet_shop.api import UsersViewset
 
 from internet_shop.auth_views import RegisterView, LoginView 
 
@@ -40,6 +41,7 @@ router.register("categories", CategoriesViewset, basename="category")
 router.register("customers", CustomersViewset, basename="customer")
 router.register("orders", OrdersViewset, basename="order")
 router.register("orderDetails", OrderDetailsViewset, basename="orderDetail")
+router.register("users", UsersViewset, basename="user")
 
 urlpatterns = [
     path('admin/', admin.site.urls),

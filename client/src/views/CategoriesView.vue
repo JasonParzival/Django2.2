@@ -2,6 +2,9 @@
 import axios from "axios";
 import { ref, onMounted, computed } from 'vue';
 import Cookies from 'js-cookie';
+import UserFilter from '../components/UserFilter.vue'
+
+const filterUserId = ref('')
 
 const loading = ref(false);
 const categories = ref([]);
@@ -21,9 +24,18 @@ async function loadCategoryStats() {
 
 async function fetchCategories() {
   loading.value = true
-  const r = await axios.get("/api/categories/")
+  const url = filterUserId.value 
+    ? `/api/categories/?user_id=${filterUserId.value}` 
+    : '/api/categories/'
+  const r = await axios.get(url)
   categories.value = r.data
   loading.value = false
+}
+
+function onFilterChange(userId) {
+  filterUserId.value = userId
+  fetchCategories()      
+  loadCategoryStats()    
 }
 
 async function onCategoryAdd() {
@@ -84,6 +96,8 @@ onMounted(async () => {
 
 <template>
   <div class="container my-5">
+    <UserFilter @filter-change="onFilterChange" />
+    
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1>Категории</h1>
       <button @click="onLoadClick" class="btn btn-outline-primary">

@@ -15,6 +15,11 @@ async function login() {
   loading.value = true
   
   try {
+    const csrftoken = Cookies.get('csrftoken')
+    if (csrftoken) {
+      axios.defaults.headers.common['X-CSRFToken'] = csrftoken
+    }
+    
     const response = await axios.post('/api/login/', {
       username: username.value,
       password: password.value

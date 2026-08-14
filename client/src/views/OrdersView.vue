@@ -2,6 +2,9 @@
 import axios from "axios";
 import { ref, onMounted, computed } from 'vue';
 import Cookies from 'js-cookie';
+import UserFilter from '../components/UserFilter.vue'
+
+const filterUserId = ref('')
 
 const statusOptions = ref([
   { value: 'В обработке'},
@@ -39,10 +42,19 @@ async function loadOrderStats() {
 
 async function fetchOrders() {
   loading.value = true;
-  const r = await axios.get("/api/orders/");
+  const url = filterUserId.value 
+    ? `/api/orders/?user_id=${filterUserId.value}` 
+    : '/api/orders/';
+  const r = await axios.get(url);
   console.log(r.data)
   orders.value = r.data;
   loading.value = false;
+}
+
+function onFilterChange(userId) {
+  filterUserId.value = userId;
+  fetchOrders();        
+  loadOrderStats();     
 }
 
 async function fetchCustomers() {
@@ -111,6 +123,7 @@ onMounted(async () => {
 
 <template>
   <div class="container my-5">
+  <UserFilter @filter-change="onFilterChange" />
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1>Заказы</h1>
       <button @click="onLoadClick" class="btn btn-outline-primary">
