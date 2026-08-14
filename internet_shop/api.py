@@ -37,6 +37,10 @@ class ProductsViewset(
     
     def get_queryset(self):
         qs = super().get_queryset()
+        
+        if self.request.user.is_superuser:
+            return qs
+        
         qs = qs.filter(user=self.request.user) 
         return qs
         
@@ -49,10 +53,12 @@ class ProductsViewset(
     
     @action(detail=False, methods=["GET"], url_path="stats")
     def get_stats(self, request, *args, **kwargs):
-        # Фильтруем статистику по пользователю
-        user_products = Product.objects.filter(user=request.user)
+        if request.user.is_superuser:
+            queryset = Product.objects.all()
+        else:
+            queryset = Product.objects.filter(user=request.user)
         
-        stats = user_products.aggregate(
+        stats = queryset.aggregate(
             total_count=Count("id"),
             avg_price=Avg("price"),
             min_price=Min("price"),
@@ -78,6 +84,10 @@ class CategoriesViewset(
     
     def get_queryset(self):
         qs = super().get_queryset()
+        
+        if self.request.user.is_superuser:
+            return qs
+        
         qs = qs.filter(user=self.request.user)
         return qs
     
@@ -88,8 +98,12 @@ class CategoriesViewset(
     
     @action(detail=False, methods=["GET"], url_path="stats")
     def get_stats(self, request, *args, **kwargs):
-        user_categories = Category.objects.filter(user=request.user)
-        user_products = Product.objects.filter(user=request.user)
+        if request.user.is_superuser:
+            user_categories = Category.objects.all()
+            user_products = Product.objects.all()
+        else:
+            user_categories = Category.objects.filter(user=request.user)
+            user_products = Product.objects.filter(user=request.user)
         
         total_categories = user_categories.count()
         total_products = user_products.count()
@@ -126,6 +140,10 @@ class CustomersViewset(
     
     def get_queryset(self):
         qs = super().get_queryset()
+        
+        if self.request.user.is_superuser:
+            return qs
+        
         qs = qs.filter(user=self.request.user)
         return qs
     
@@ -137,8 +155,12 @@ class CustomersViewset(
     
     @action(detail=False, methods=["GET"], url_path="stats")
     def get_stats(self, request, *args, **kwargs):
-        user_customers = Customer.objects.filter(user=request.user)
-        user_orders = Order.objects.filter(user=request.user)
+        if request.user.is_superuser:
+            user_customers = Customer.objects.all()
+            user_orders = Order.objects.all()
+        else:
+            user_customers = Customer.objects.filter(user=request.user)
+            user_orders = Order.objects.filter(user=request.user)
         
         total_customers = user_customers.count()
         total_orders = user_orders.count()
@@ -174,6 +196,10 @@ class OrdersViewset(
     
     def get_queryset(self):
         qs = super().get_queryset()
+        
+        if self.request.user.is_superuser:
+            return qs
+        
         qs = qs.filter(user=self.request.user)
         return qs
     
@@ -187,7 +213,10 @@ class OrdersViewset(
     def get_stats(self, request, *args, **kwargs):
         from django.utils import timezone
         
-        user_orders = Order.objects.filter(user=request.user) 
+        if request.user.is_superuser:
+            user_orders = Order.objects.all()
+        else:
+            user_orders = Order.objects.filter(user=request.user)
         
         total_orders = user_orders.count()
         
@@ -231,6 +260,10 @@ class OrderDetailsViewset(
     
     def get_queryset(self):
         qs = super().get_queryset()
+        
+        if self.request.user.is_superuser:
+            return qs
+        
         qs = qs.filter(user=self.request.user)
         return qs
     
@@ -243,7 +276,10 @@ class OrderDetailsViewset(
     
     @action(detail=False, methods=["GET"], url_path="stats")
     def get_stats(self, request, *args, **kwargs):
-        user_order_details = OrderDetail.objects.filter(user=request.user)
+        if request.user.is_superuser:
+            user_order_details = OrderDetail.objects.all()
+        else:
+            user_order_details = OrderDetail.objects.filter(user=request.user)
         
         stats = user_order_details.aggregate(
             total_count=Count("id"),
