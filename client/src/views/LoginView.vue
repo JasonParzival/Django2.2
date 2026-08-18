@@ -25,17 +25,11 @@ async function login() {
       password: password.value
     })
     
-    // Сохраняем токен
     const token = response.data.token
     localStorage.setItem('authToken', token)
     
-    // Устанавливаем заголовок для всех будущих запросов
     axios.defaults.headers.common['Authorization'] = `Token ${token}`
     
-    // Получаем CSRF токен
-    //await axios.get('/api/customers/')
-    
-    // Перенаправляем на страницу товаров
     router.push('/products')
   } catch (err) {
     if (err.response && err.response.data) {

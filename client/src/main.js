@@ -3,7 +3,10 @@ import { createPinia } from 'pinia'
 import axios from 'axios' 
 import "bootstrap/dist/css/bootstrap.css"
 //import "bootstrap-icons/font/bootstrap-icons.min.css"
-import "bootstrap/dist/js/bootstrap"
+//import "bootstrap/dist/js/bootstrap"
+import * as bootstrap from 'bootstrap'
+
+window.bootstrap = bootstrap
 
 import App from './App.vue'
 import router from './router'

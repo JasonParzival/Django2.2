@@ -5,6 +5,7 @@ import Cookies from 'js-cookie';
 import UserFilter from '../components/UserFilter.vue'
 import OTPModal from '../components/OTPModal.vue'
 import { Modal } from 'bootstrap'
+import FilterPanel from '../components/FilterPanel.vue'
 
 const filterUserId = ref('')
 
@@ -25,6 +26,17 @@ const pendingEditItem = ref(null)
 const isOTPVerified = ref(false)
 const pendingDeleteItem = ref(null)
 const editModalRef = ref(null)
+
+const fieldFilters = ref([
+  { key: 'name', label: 'Название', type: 'text', placeholder: 'Фильтровать по названию...' },
+  { key: 'price_min', label: 'Цена от', type: 'number_min', placeholder: 'От' },
+  { key: 'price_max', label: 'до', type: 'number_max', placeholder: 'До' },
+  { key: 'quantity_min', label: 'Кол-во от', type: 'number_min', placeholder: 'От' },
+  { key: 'quantity_max', label: 'до', type: 'number_max', placeholder: 'До' },
+])
+
+const filterCategories = ref([])
+const activeFieldFilters = ref({})
 
 const groupsById = computed(() => {
   const map = {};
@@ -108,9 +120,21 @@ async function loadProductStats() {
 
 async function fetchProducts() {
   loading.value = true;
-  const url = filterUserId.value 
-    ? `/api/products/?user_id=${filterUserId.value}` 
-    : '/api/products/';
+  
+  const params = new URLSearchParams()
+  
+  if (filterUserId.value) {
+    params.append('user_id', filterUserId.value)
+  }
+  
+  Object.keys(activeFieldFilters.value).forEach(key => {
+    const val = activeFieldFilters.value[key]
+    if (val !== '' && val !== null && val !== undefined) {
+      params.append(key, val)
+    }
+  })
+  
+  const url = `/api/products/?${params.toString()}`
   const r = await axios.get(url);
   console.log(r.data)
   products.value = r.data;
@@ -129,6 +153,39 @@ async function fetchCategories() {
   console.log(r.data)
   categories.value = r.data;
   loading.value = false;
+}
+
+function onFieldFilterChange(filters) {
+  activeFieldFilters.value = filters
+  fetchProducts()
+  loadProductStats()
+}
+
+function onFieldFilterReset() {
+  activeFieldFilters.value = {}
+  fetchProducts()
+  loadProductStats()
+}
+
+async function fetchFilterCategories() {
+  try {
+    const r = await axios.get('/api/categories/')
+    filterCategories.value = r.data.map(cat => ({
+      id: cat.id,
+      name: cat.name
+    }))
+    if (!fieldFilters.value.find(f => f.key === 'category')) {
+      fieldFilters.value.push({
+        key: 'category',
+        label: 'Категория',
+        type: 'select',
+        placeholder: 'Все категории',
+        options: filterCategories.value
+      })
+    }
+  } catch (err) {
+    console.error('Ошибка загрузки категорий для фильтра:', err)
+  }
 }
 
 async function productsAddPictureChange() {
@@ -248,7 +305,7 @@ async function onProductEditClick(product) {
 async function onLoadClick() {
   loading.value = true;
   try {
-    await Promise.all([fetchProducts(), fetchCategories(), loadProductStats()]);
+    await Promise.all([fetchProducts(), fetchCategories(), loadProductStats(), fetchFilterCategories()]);
   } finally {
     loading.value = false;
   }
@@ -280,6 +337,11 @@ function openImageModal(imageUrl) {
 
   <div class="container my-5">
     <UserFilter @filter-change="onFilterChange" />
+    <FilterPanel 
+      :filters="fieldFilters" 
+      @filter-change="onFieldFilterChange"
+      @filter-reset="onFieldFilterReset"
+    />
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1>Товары</h1>
       <button @click="onLoadClick" class="btn btn-outline-primary">

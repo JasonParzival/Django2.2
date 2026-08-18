@@ -5,6 +5,7 @@ import Cookies from 'js-cookie';
 import UserFilter from '../components/UserFilter.vue'
 import OTPModal from '../components/OTPModal.vue'
 import { Modal } from 'bootstrap'
+import FilterPanel from '../components/FilterPanel.vue'
 
 const filterUserId = ref('')
 
@@ -22,6 +23,14 @@ const editModalRef = ref(null)
 const pendingEditItem = ref(null)
 const pendingDeleteItem = ref(null)
 const isOTPVerified = ref(false)
+
+const fieldFilters = ref([
+  { key: 'quantity_min', label: 'Кол-во от', type: 'number_min', placeholder: 'От' },
+  { key: 'quantity_max', label: 'до', type: 'number_max', placeholder: 'До' },
+])
+const filterOrders = ref([])
+const filterProductsForOrder = ref([])
+const activeFieldFilters = ref({})
 
 const ordersById = computed(() => {
   const map = {};
@@ -42,6 +51,48 @@ const productsById = computed(() => {
 async function loadOrderDetailStats() {
   const response = await axios.get('/api/orderDetails/stats/');
   orderDetailStats.value = response.data;
+}
+
+async function fetchFilterOrders() {
+  try {
+    const r = await axios.get('/api/orders/')
+    filterOrders.value = r.data.map(o => ({
+      id: o.id,
+      name: `№${o.order_number} от ${o.date}`
+    }))
+    if (!fieldFilters.value.find(f => f.key === 'order')) {
+      fieldFilters.value.push({
+        key: 'order',
+        label: 'Заказ',
+        type: 'select',
+        placeholder: 'Все заказы',
+        options: filterOrders.value
+      })
+    }
+  } catch (err) {
+    console.error('Ошибка загрузки заказов для фильтра:', err)
+  }
+}
+
+async function fetchFilterProductsForOrder() {
+  try {
+    const r = await axios.get('/api/products/')
+    filterProductsForOrder.value = r.data.map(p => ({
+      id: p.id,
+      name: p.name
+    }))
+    if (!fieldFilters.value.find(f => f.key === 'product')) {
+      fieldFilters.value.push({
+        key: 'product',
+        label: 'Товар',
+        type: 'select',
+        placeholder: 'Все товары',
+        options: filterProductsForOrder.value
+      })
+    }
+  } catch (err) {
+    console.error('Ошибка загрузки товаров для фильтра:', err)
+  }
 }
 
 /*onMounted(() => {
@@ -109,9 +160,21 @@ function onOTPCancel() {
 
 async function fetchOrderDetails() {
   loading.value = true;
-  const url = filterUserId.value 
-    ? `/api/orderDetails/?user_id=${filterUserId.value}` 
-    : '/api/orderDetails/';
+  
+  const params = new URLSearchParams()
+  
+  if (filterUserId.value) {
+    params.append('user_id', filterUserId.value)
+  }
+  
+  Object.keys(activeFieldFilters.value).forEach(key => {
+    const val = activeFieldFilters.value[key]
+    if (val !== '' && val !== null && val !== undefined) {
+      params.append(key, val)
+    }
+  })
+  
+  const url = `/api/orderDetails/?${params.toString()}`
   const r = await axios.get(url);
   console.log(r.data)
   orderDetails.value = r.data;
@@ -122,6 +185,18 @@ function onFilterChange(userId) {
   filterUserId.value = userId;
   fetchOrderDetails();      
   loadOrderDetailStats();   
+}
+
+function onFieldFilterChange(filters) {
+  activeFieldFilters.value = filters
+  fetchOrderDetails()
+  loadOrderDetailStats()
+}
+
+function onFieldFilterReset() {
+  activeFieldFilters.value = {}
+  fetchOrderDetails()
+  loadOrderDetailStats()
 }
 
 async function fetchOrders() {
@@ -190,7 +265,7 @@ async function onOrderDetailEditClick(orderDetail) {
 async function onLoadClick() {
   loading.value = true;
   try {
-    await Promise.all([fetchOrderDetails(), fetchOrders(), fetchProducts(), loadOrderDetailStats()]);
+    await Promise.all([fetchOrderDetails(), fetchOrders(), fetchProducts(), loadOrderDetailStats(), fetchFilterOrders(), fetchFilterProductsForOrder()]);
   } finally {
     loading.value = false;
   }
@@ -204,6 +279,13 @@ onMounted(async () => {
 <template>
   <div class="container my-5">
     <UserFilter @filter-change="onFilterChange" />
+
+    <FilterPanel 
+      :filters="fieldFilters" 
+      @filter-change="onFieldFilterChange"
+      @filter-reset="onFieldFilterReset"
+    />
+
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1>Детали заказа</h1>
       <button @click="onLoadClick" class="btn btn-outline-primary">

@@ -5,6 +5,7 @@ import Cookies from 'js-cookie';
 import UserFilter from '../components/UserFilter.vue'
 import OTPModal from '../components/OTPModal.vue'
 import { Modal } from 'bootstrap'
+import FilterPanel from '../components/FilterPanel.vue'
 
 const filterUserId = ref('')
 
@@ -20,6 +21,13 @@ const editModalRef = ref(null)
 const pendingEditItem = ref(null)
 const pendingDeleteItem = ref(null)
 const isOTPVerified = ref(false)
+
+const fieldFilters = ref([
+  { key: 'name', label: 'Название', type: 'text', placeholder: 'Фильтровать по названию...' },
+  { key: 'description', label: 'Описание', type: 'text', placeholder: 'Фильтровать по описанию...' },
+])
+
+const activeFieldFilters = ref({})
 
 /*onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
@@ -91,9 +99,21 @@ async function loadCategoryStats() {
 
 async function fetchCategories() {
   loading.value = true
-  const url = filterUserId.value 
-    ? `/api/categories/?user_id=${filterUserId.value}` 
-    : '/api/categories/'
+  
+  const params = new URLSearchParams()
+  
+  if (filterUserId.value) {
+    params.append('user_id', filterUserId.value)
+  }
+  
+  Object.keys(activeFieldFilters.value).forEach(key => {
+    const val = activeFieldFilters.value[key]
+    if (val !== '' && val !== null && val !== undefined) {
+      params.append(key, val)
+    }
+  })
+  
+  const url = `/api/categories/?${params.toString()}`
   const r = await axios.get(url)
   categories.value = r.data
   loading.value = false
@@ -103,6 +123,18 @@ function onFilterChange(userId) {
   filterUserId.value = userId
   fetchCategories()      
   loadCategoryStats()    
+}
+
+function onFieldFilterChange(filters) {
+  activeFieldFilters.value = filters
+  fetchCategories()
+  loadCategoryStats()
+}
+
+function onFieldFilterReset() {
+  activeFieldFilters.value = {}
+  fetchCategories()
+  loadCategoryStats()
 }
 
 async function onCategoryAdd() {
@@ -168,6 +200,12 @@ onMounted(async () => {
 <template>
   <div class="container my-5">
     <UserFilter @filter-change="onFilterChange" />
+
+    <FilterPanel 
+      :filters="fieldFilters" 
+      @filter-change="onFieldFilterChange"
+      @filter-reset="onFieldFilterReset"
+    />
     
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1>Категории</h1>

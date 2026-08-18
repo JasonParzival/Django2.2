@@ -5,6 +5,7 @@ import Cookies from 'js-cookie';
 import UserFilter from '../components/UserFilter.vue'
 import OTPModal from '../components/OTPModal.vue'
 import { Modal } from 'bootstrap'
+import FilterPanel from '../components/FilterPanel.vue'
 
 const filterUserId = ref('')
 
@@ -31,6 +32,21 @@ const pendingEditItem = ref(null)
 const pendingDeleteItem = ref(null)
 const isOTPVerified = ref(false)
 
+const filterCustomers = ref([])
+const fieldFilters = ref([
+  { key: 'order_number', label: 'Номер заказа', type: 'text', placeholder: 'Фильтровать по номеру...' },
+  { key: 'date_from', label: 'Дата от', type: 'date' },
+  { key: 'date_to', label: 'Дата до', type: 'date' },
+  { 
+    key: 'status', 
+    label: 'Статус', 
+    type: 'select', 
+    placeholder: 'Все статусы',
+    options: statusOptions.value.map(s => ({ value: s.value, label: s.value }))
+  },
+])
+const activeFieldFilters = ref({})
+
 const groupsById = computed(() => {
   const map = {};
   customers.value.forEach(cat => {
@@ -42,6 +58,27 @@ const groupsById = computed(() => {
 /*onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
 })*/
+
+async function fetchFilterCustomers() {
+  try {
+    const r = await axios.get('/api/customers/')
+    filterCustomers.value = r.data.map(c => ({
+      id: c.id,
+      name: c.name
+    }))
+    if (!fieldFilters.value.find(f => f.key === 'customer')) {
+      fieldFilters.value.push({
+        key: 'customer',
+        label: 'Клиент',
+        type: 'select',
+        placeholder: 'Все клиенты',
+        options: filterCustomers.value
+      })
+    }
+  } catch (err) {
+    console.error('Ошибка загрузки клиентов для фильтра:', err)
+  }
+}
 
 async function checkOTPBeforeEdit(item) {
   if (isOTPVerified.value) {
@@ -109,9 +146,21 @@ async function loadOrderStats() {
 
 async function fetchOrders() {
   loading.value = true;
-  const url = filterUserId.value 
-    ? `/api/orders/?user_id=${filterUserId.value}` 
-    : '/api/orders/';
+  
+  const params = new URLSearchParams()
+  
+  if (filterUserId.value) {
+    params.append('user_id', filterUserId.value)
+  }
+  
+  Object.keys(activeFieldFilters.value).forEach(key => {
+    const val = activeFieldFilters.value[key]
+    if (val !== '' && val !== null && val !== undefined) {
+      params.append(key, val)
+    }
+  })
+  
+  const url = `/api/orders/?${params.toString()}`
   const r = await axios.get(url);
   console.log(r.data)
   orders.value = r.data;
@@ -122,6 +171,18 @@ function onFilterChange(userId) {
   filterUserId.value = userId;
   fetchOrders();        
   loadOrderStats();     
+}
+
+function onFieldFilterChange(filters) {
+  activeFieldFilters.value = filters
+  fetchOrders()
+  loadOrderStats()
+}
+
+function onFieldFilterReset() {
+  activeFieldFilters.value = {}
+  fetchOrders()
+  loadOrderStats()
 }
 
 async function fetchCustomers() {
@@ -181,7 +242,7 @@ async function onOrderEditClick(order) {
 async function onLoadClick() {
   loading.value = true;
   try {
-    await Promise.all([fetchOrders(), fetchCustomers(), loadOrderStats()]);
+    await Promise.all([fetchOrders(), fetchCustomers(), loadOrderStats(), fetchFilterCustomers()]);
   } finally {
     loading.value = false;
   }
@@ -194,7 +255,14 @@ onMounted(async () => {
 
 <template>
   <div class="container my-5">
-  <UserFilter @filter-change="onFilterChange" />
+    <UserFilter @filter-change="onFilterChange" />
+
+    <FilterPanel 
+      :filters="fieldFilters" 
+      @filter-change="onFieldFilterChange"
+      @filter-reset="onFieldFilterReset"
+    />
+
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1>Заказы</h1>
       <button @click="onLoadClick" class="btn btn-outline-primary">

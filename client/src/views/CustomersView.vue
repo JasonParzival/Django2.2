@@ -5,6 +5,7 @@ import Cookies from 'js-cookie';
 import UserFilter from '../components/UserFilter.vue'
 import OTPModal from '../components/OTPModal.vue'
 import { Modal } from 'bootstrap'
+import FilterPanel from '../components/FilterPanel.vue'
 
 const filterUserId = ref('')
 
@@ -24,6 +25,15 @@ const editModalRef = ref(null)
 const pendingEditItem = ref(null)
 const pendingDeleteItem = ref(null)
 const isOTPVerified = ref(false)
+
+const fieldFilters = ref([
+  { key: 'name', label: 'ФИО', type: 'text', placeholder: 'Фильтровать по имени...' },
+  { key: 'address', label: 'Адрес', type: 'text', placeholder: 'Фильтровать по адресу...' },
+  { key: 'phone_number', label: 'Телефон', type: 'text', placeholder: 'Фильтровать по телефону...' },
+  { key: 'email', label: 'Email', type: 'text', placeholder: 'Фильтровать по email...' },
+])
+
+const activeFieldFilters = ref({})
 
 /*onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
@@ -94,19 +104,43 @@ async function loadCustomerStats() {
 }
 
 async function fetchCustomers() {
-  loading.value = true;
-  const url = filterUserId.value 
-    ? `/api/customers/?user_id=${filterUserId.value}` 
-    : '/api/customers/';
-  const r = await axios.get(url);
-  customers.value = r.data;
-  loading.value = false;
+  loading.value = true
+  
+  const params = new URLSearchParams()
+  
+  if (filterUserId.value) {
+    params.append('user_id', filterUserId.value)
+  }
+  
+  Object.keys(activeFieldFilters.value).forEach(key => {
+    const val = activeFieldFilters.value[key]
+    if (val !== '' && val !== null && val !== undefined) {
+      params.append(key, val)
+    }
+  })
+  
+  const url = `/api/customers/?${params.toString()}`
+  const r = await axios.get(url)
+  customers.value = r.data
+  loading.value = false
 }
 
 function onFilterChange(userId) {
   filterUserId.value = userId;
   fetchCustomers();     
   loadCustomerStats();   
+}
+
+function onFieldFilterChange(filters) {
+  activeFieldFilters.value = filters
+  fetchCustomers()
+  loadCustomerStats()
+}
+
+function onFieldFilterReset() {
+  activeFieldFilters.value = {}
+  fetchCustomers()
+  loadCustomerStats()
 }
 
 async function customersAddPictureChange() {
@@ -229,6 +263,13 @@ function openImageModal(imageUrl) {
 
   <div class="container my-5">
     <UserFilter @filter-change="onFilterChange" />
+
+    <FilterPanel 
+      :filters="fieldFilters" 
+      @filter-change="onFieldFilterChange"
+      @filter-reset="onFieldFilterReset"
+    />
+
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1>Клиенты</h1>
       <button @click="onLoadClick" class="btn btn-outline-primary">

@@ -3,7 +3,7 @@
     <div class="modal-dialog modal-sm">
       <div class="modal-content">
         <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title">🔐 Двухфакторная аутентификация</h5>
+          <h5 class="modal-title">Двухфакторная аутентификация</h5>
           <button 
             type="button" 
             class="btn-close btn-close-white" 
@@ -92,13 +92,11 @@ async function verifyOTP() {
     })
     
     if (response.data.success) {
-      success.value = '✅ OTP подтвержден!'
+      success.value = 'OTP подтвержден!'
       isVerified = true
       
-      // Отправляем событие о подтверждении
       emit('verified')
       
-      // Закрываем модалку через 500ms
       setTimeout(() => {
         hideModal()
         resetState()
@@ -110,7 +108,6 @@ async function verifyOTP() {
     } else {
       error.value = 'Ошибка при проверке кода'
     }
-    // При ошибке не закрываем модалку
   } finally {
     loading.value = false
   }
@@ -123,7 +120,6 @@ function onCancel() {
 }
 
 function onModalClose() {
-  // Если пользователь закрыл крестиком и не было подтверждения
   if (!isVerified) {
     resetState()
     emit('cancel')
@@ -142,7 +138,6 @@ function showModal() {
   resetState()
   if (modalInstance) {
     modalInstance.show()
-    // Фокус на поле ввода
     setTimeout(() => {
       const input = document.querySelector('#otpModal input')
       if (input) input.focus()
@@ -164,9 +159,7 @@ onMounted(() => {
       keyboard: false
     })
     
-    // Обработчик скрытия модалки
     modalElement.addEventListener('hidden.bs.modal', () => {
-      // Если модалка скрыта без подтверждения
       if (!isVerified) {
         resetState()
         emit('cancel')

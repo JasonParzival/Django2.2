@@ -161,9 +161,39 @@ class ProductsViewset(
             user_id = self.request.query_params.get('user_id')
             if user_id:
                 qs = qs.filter(user_id=user_id)
-            return qs
+        else:
+            qs = qs.filter(user=self.request.user)
         
-        qs = qs.filter(user=self.request.user) 
+        params = self.request.query_params
+        
+        name = params.get('name')
+        if name:
+            qs = qs.filter(name__icontains=name)
+        
+        description = params.get('description')
+        if description:
+            qs = qs.filter(description__icontains=description)
+        
+        price_min = params.get('price_min')
+        if price_min:
+            qs = qs.filter(price__gte=price_min)
+        
+        price_max = params.get('price_max')
+        if price_max:
+            qs = qs.filter(price__lte=price_max)
+        
+        quantity_min = params.get('quantity_min')
+        if quantity_min:
+            qs = qs.filter(quantity__gte=quantity_min)
+        
+        quantity_max = params.get('quantity_max')
+        if quantity_max:
+            qs = qs.filter(quantity__lte=quantity_max)
+        
+        category = params.get('category')
+        if category:
+            qs = qs.filter(category_id=category)
+        
         return qs
     
     def get_permissions(self):
@@ -216,9 +246,19 @@ class CategoriesViewset(
             user_id = self.request.query_params.get('user_id')
             if user_id:
                 qs = qs.filter(user_id=user_id)
-            return qs
+        else:
+            qs = qs.filter(user=self.request.user)
         
-        qs = qs.filter(user=self.request.user)
+        params = self.request.query_params
+        
+        name = params.get('name')
+        if name:
+            qs = qs.filter(name__icontains=name)
+        
+        description = params.get('description')
+        if description:
+            qs = qs.filter(description__icontains=description)
+        
         return qs
     
     def get_permissions(self):
@@ -280,9 +320,27 @@ class CustomersViewset(
             user_id = self.request.query_params.get('user_id')
             if user_id:
                 qs = qs.filter(user_id=user_id)
-            return qs
+        else:
+            qs = qs.filter(user=self.request.user)
         
-        qs = qs.filter(user=self.request.user)
+        params = self.request.query_params
+        
+        name = params.get('name')
+        if name:
+            qs = qs.filter(name__icontains=name)
+        
+        address = params.get('address')
+        if address:
+            qs = qs.filter(address__icontains=address)
+        
+        phone_number = params.get('phone_number')
+        if phone_number:
+            qs = qs.filter(phone_number__icontains=phone_number)
+        
+        email = params.get('email')
+        if email:
+            qs = qs.filter(email__icontains=email)
+        
         return qs
     
     def get_permissions(self):
@@ -344,9 +402,31 @@ class OrdersViewset(
             user_id = self.request.query_params.get('user_id')
             if user_id:
                 qs = qs.filter(user_id=user_id)
-            return qs
+        else:
+            qs = qs.filter(user=self.request.user)
         
-        qs = qs.filter(user=self.request.user)
+        params = self.request.query_params
+        
+        order_number = params.get('order_number')
+        if order_number:
+            qs = qs.filter(order_number=order_number)
+        
+        date_from = params.get('date_from')
+        if date_from:
+            qs = qs.filter(date__gte=date_from)
+        
+        date_to = params.get('date_to')
+        if date_to:
+            qs = qs.filter(date__lte=date_to)
+        
+        status = params.get('status')
+        if status:
+            qs = qs.filter(status=status)
+        
+        customer = params.get('customer')
+        if customer:
+            qs = qs.filter(customer_id=customer)
+        
         return qs
     
     def get_permissions(self):
@@ -416,9 +496,27 @@ class OrderDetailsViewset(
             user_id = self.request.query_params.get('user_id')
             if user_id:
                 qs = qs.filter(user_id=user_id)
-            return qs
+        else:
+            qs = qs.filter(user=self.request.user)
         
-        qs = qs.filter(user=self.request.user)
+        params = self.request.query_params
+        
+        quantity_min = params.get('quantity_min')
+        if quantity_min:
+            qs = qs.filter(quantity__gte=quantity_min)
+        
+        quantity_max = params.get('quantity_max')
+        if quantity_max:
+            qs = qs.filter(quantity__lte=quantity_max)
+        
+        order = params.get('order')
+        if order:
+            qs = qs.filter(order_id=order)
+        
+        product = params.get('product')
+        if product:
+            qs = qs.filter(product_id=product)
+        
         return qs
 
     def get_permissions(self):
