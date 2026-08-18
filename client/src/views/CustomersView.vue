@@ -3,6 +3,8 @@ import axios, { Axios } from "axios";
 import { ref, onMounted, computed } from 'vue';
 import Cookies from 'js-cookie';
 import UserFilter from '../components/UserFilter.vue'
+import OTPModal from '../components/OTPModal.vue'
+import { Modal } from 'bootstrap'
 
 const filterUserId = ref('')
 
@@ -17,9 +19,74 @@ const customerStats = ref(null);
 
 const imageModalUrl = ref("")
 
+const otpModalRef = ref(null)
+const editModalRef = ref(null)
+const pendingEditItem = ref(null)
+const pendingDeleteItem = ref(null)
+const isOTPVerified = ref(false)
+
 /*onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
 })*/
+
+async function checkOTPBeforeEdit(item) {
+  if (isOTPVerified.value) {
+    onCustomerEditClick(item)
+    return
+  }
+  
+  pendingEditItem.value = item
+  
+  try {
+    const response = await axios.get('/api/otp/status/')
+    if (response.data.otp_verified) {
+      isOTPVerified.value = true
+      onCustomerEditClick(item)
+      pendingEditItem.value = null
+    } else {
+      otpModalRef.value?.showModal()
+    }
+  } catch (err) {
+    otpModalRef.value?.showModal()
+  }
+}
+
+async function checkOTPBeforeDelete(item) {
+  if (isOTPVerified.value) {
+    onRemoveClick(item)
+    return
+  }
+  
+  pendingDeleteItem.value = item
+  
+  try {
+    const response = await axios.get('/api/otp/status/')
+    if (response.data.otp_verified) {
+      isOTPVerified.value = true
+      onRemoveClick(item)
+      pendingDeleteItem.value = null
+    } else {
+      otpModalRef.value?.showModal()
+    }
+  } catch (err) {
+    otpModalRef.value?.showModal()
+  }
+}
+
+function onOTPVerified() {
+  isOTPVerified.value = true
+  
+  if (pendingEditItem.value) {
+    const itemToEdit = pendingEditItem.value
+    pendingEditItem.value = null
+    onCustomerEditClick(itemToEdit)
+  }
+}
+
+function onOTPCancel() {
+  pendingEditItem.value = null
+  pendingDeleteItem.value = null
+}
 
 async function loadCustomerStats() {
   const response = await axios.get('/api/customers/stats/');
@@ -119,7 +186,11 @@ async function onRemoveClick(customer) {
 }
 
 async function onCustomerEditClick(customer) {
-  customerToEdit.value = { ...customer };
+  customerToEdit.value = { ...customer }
+  if (editModalRef.value) {
+    const modal = new Modal(editModalRef.value)
+    modal.show()
+  }
 }
 
 async function onLoadClick() {
@@ -237,8 +308,9 @@ function openImageModal(imageUrl) {
       </form>
     </div>
     
+  <OTPModal ref="otpModalRef" @verified="onOTPVerified" @cancel="onOTPCancel" />
 
-    <div class="modal fade" id="editCustomerModal" tabindex="-1">
+    <div class="modal fade" id="editCustomerModal" tabindex="-1" ref="editModalRef">
       <div class="modal-dialog modal-lg">
         <div class="modal-content pb-3">
           <div class="modal-header">
@@ -369,16 +441,14 @@ function openImageModal(imageUrl) {
                 <div class="d-flex gap-2 justify-content-end">
                   <button
                     class="btn btn-outline-primary btn-lg"
-                    @click="onCustomerEditClick(item)"
-                    data-bs-toggle="modal"
-                    data-bs-target="#editCustomerModal"
+                    @click="checkOTPBeforeEdit(item)"
                     title="Редактировать"
                   >
                     <i class="bi bi-pen-fill"></i>
                   </button>
                   <button 
                     class="btn btn-outline-danger btn-lg"
-                    @click="onRemoveClick(item)"
+                    @click="checkOTPBeforeDelete(item)"
                     title="Удалить"
                   >
                     <i class="bi bi-x-lg"></i>

@@ -2,7 +2,18 @@ from django.db import models
 
 from django.contrib.auth.models import User
 
-# Create your models here.
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    otp_key = models.CharField("OTP ключ", max_length=255, null=True, blank=True)
+    
+    class Meta:
+        verbose_name = "Профиль пользователя"
+        verbose_name_plural = "Профили пользователей"
+    
+    def __str__(self):
+        return f"Профиль {self.user.username}"
+    
+    
 class Product(models.Model):
     name = models.TextField("Название")
     price = models.DecimalField("Цена", max_digits=10, decimal_places=2)

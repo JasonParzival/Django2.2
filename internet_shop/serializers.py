@@ -12,6 +12,9 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'email']
+        
+class OTPSerializer(serializers.Serializer):
+    code = serializers.CharField(max_length=6, min_length=6, help_text="6-значный код")
 
 # №2
 class CategorySerializer(serializers.ModelSerializer):

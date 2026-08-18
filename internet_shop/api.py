@@ -1,3 +1,5 @@
+import pyotp
+from django.core.cache import cache
 from rest_framework.viewsets import GenericViewSet
 from rest_framework import mixins
 
@@ -5,7 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import serializers
 from django.db.models import Avg, Count, Max, Min, Sum
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, BasePermission, AllowAny
 
 from internet_shop.models import Product
 from internet_shop.serializers import ProductSerializer
@@ -25,6 +27,8 @@ from internet_shop.serializers import OrderDetailSerializer
 from internet_shop.serializers import UserSerializer
 from django.contrib.auth.models import User
 
+from internet_shop.serializers import OTPSerializer
+
 class UsersViewset(
     mixins.ListModelMixin,
     GenericViewSet
@@ -37,6 +41,105 @@ class UsersViewset(
         if self.request.user.is_superuser:
             return super().get_queryset()
         return User.objects.none()
+    
+class OTPRequired(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        otp_verified = cache.get(f'otp_verified_{request.user.id}', False)
+        
+        if request.user.is_superuser:
+            return True
+        
+        return otp_verified
+
+class OTPViewset(GenericViewSet):
+    permission_classes = [IsAuthenticated]
+    
+    class OTPStatusSerializer(serializers.Serializer):
+        otp_verified = serializers.BooleanField()
+        expires_in = serializers.IntegerField(required=False)
+    
+    @action(detail=False, methods=["POST"], url_path="verify")
+    def verify_otp(self, request, *args, **kwargs):
+        serializer = OTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        code = serializer.validated_data['code']
+        
+        try:
+            profile = request.user.profile
+            otp_key = profile.otp_key
+        except AttributeError:
+            return Response({
+                'success': False,
+                'error': 'У пользователя нет OTP-ключа'
+            }, status=400)
+        
+        if not otp_key:
+            return Response({
+                'success': False,
+                'error': 'OTP не настроен'
+            }, status=400)
+        
+        totp = pyotp.TOTP(otp_key)
+        is_valid = totp.verify(code)
+        
+        if is_valid:
+            cache.set(f'otp_verified_{request.user.id}', True, 60)
+            return Response({
+                'success': True,
+                'message': 'OTP код подтвержден'
+            })
+        else:
+            return Response({
+                'success': False,
+                'error': 'Неверный OTP код'
+            }, status=400)
+    
+    @action(detail=False, methods=["GET"], url_path="status")
+    def get_otp_status(self, request, *args, **kwargs):
+        otp_verified = cache.get(f'otp_verified_{request.user.id}', False)
+        
+        has_otp = False
+        try:
+            has_otp = bool(request.user.profile.otp_key)
+        except AttributeError:
+            pass
+        
+        return Response({
+            'otp_verified': otp_verified,
+            'has_otp_key': has_otp,
+            'message': 'OTP подтвержден' if otp_verified else 'Требуется подтверждение OTP'
+        })
+    
+    @action(detail=False, methods=["GET"], url_path="setup")
+    def get_otp_setup(self, request, *args, **kwargs):
+        try:
+            profile = request.user.profile
+            otp_key = profile.otp_key
+        except AttributeError:
+            return Response({
+                'error': 'Профиль пользователя не найден'
+            }, status=400)
+        
+        if not otp_key:
+            otp_key = pyotp.random_base32()
+            profile.otp_key = otp_key
+            profile.save()
+        
+        totp = pyotp.TOTP(otp_key)
+        provisioning_uri = totp.provisioning_uri(
+            name=request.user.email or request.user.username,
+            issuer_name="Интернет-магазин"
+        )
+        
+        return Response({
+            'otp_key': otp_key,
+            'provisioning_uri': provisioning_uri,
+            'username': request.user.username
+        })
 
 class ProductsViewset(
     mixins.UpdateModelMixin,
@@ -62,6 +165,11 @@ class ProductsViewset(
         
         qs = qs.filter(user=self.request.user) 
         return qs
+    
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), OTPRequired()]
+        return [IsAuthenticated()]
         
     class ProductStatsSerializer(serializers.Serializer):
         total_count = serializers.IntegerField()
@@ -112,6 +220,11 @@ class CategoriesViewset(
         
         qs = qs.filter(user=self.request.user)
         return qs
+    
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), OTPRequired()]
+        return [IsAuthenticated()]
     
     class CategoryStatsSerializer(serializers.Serializer):
         total_count = serializers.IntegerField()
@@ -172,6 +285,11 @@ class CustomersViewset(
         qs = qs.filter(user=self.request.user)
         return qs
     
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), OTPRequired()]
+        return [IsAuthenticated()]
+    
     class CustomerStatsSerializer(serializers.Serializer):
         total_count = serializers.IntegerField()
         customers_with_orders = serializers.IntegerField()
@@ -230,6 +348,11 @@ class OrdersViewset(
         
         qs = qs.filter(user=self.request.user)
         return qs
+    
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), OTPRequired()]
+        return [IsAuthenticated()]
     
     class OrderStatsSerializer(serializers.Serializer):
         total_count = serializers.IntegerField()
@@ -297,7 +420,11 @@ class OrderDetailsViewset(
         
         qs = qs.filter(user=self.request.user)
         return qs
-    
+
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), OTPRequired()]
+        return [IsAuthenticated()]    
     class OrderDetailStatsSerializer(serializers.Serializer):
         total_count = serializers.IntegerField()
         total_quantity = serializers.IntegerField()

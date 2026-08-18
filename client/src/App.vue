@@ -23,6 +23,7 @@ function logout() {
           <router-link to="/customers" class="nav-link">Клиент</router-link>
           <router-link to="/orders" class="nav-link">Заказы</router-link>
           <router-link to="/orderDetails" class="nav-link">Детали заказа</router-link>
+          <router-link to="/otp" class="nav-link">🔐 2FA</router-link>
         </div>
 
         <ul class="navbar-nav">

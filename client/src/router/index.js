@@ -6,6 +6,7 @@ import OrdersView from '../views/OrdersView.vue'
 import OrderDetailsView from '../views/OrderDetailsView.vue'
 import LoginView from '../views/LoginView.vue' 
 import RegisterView from '../views/RegisterView.vue' 
+import OTPSetupView from '../views/OTPSetupView.vue'
 
 // Проверка авторизации
 const isAuthenticated = () => {
@@ -57,6 +58,12 @@ const routes = [
     path: '/orderDetails',
     name: 'orderDetails',
     component: OrderDetailsView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/otp',
+    name: 'otp',
+    component: OTPSetupView,
     meta: { requiresAuth: true }
   },
 ]

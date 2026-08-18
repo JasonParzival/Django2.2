@@ -3,6 +3,8 @@ import axios from "axios";
 import { ref, onMounted, computed } from 'vue';
 import Cookies from 'js-cookie';
 import UserFilter from '../components/UserFilter.vue'
+import OTPModal from '../components/OTPModal.vue'
+import { Modal } from 'bootstrap'
 
 const filterUserId = ref('')
 
@@ -14,6 +16,12 @@ const orderDetailToAdd = ref({ order: null, product: null, quantity: null });
 const orderDetailToEdit = ref({ id: null, order: null, product: null, quantity: null });
 
 const orderDetailStats = ref(null);
+
+const otpModalRef = ref(null)
+const editModalRef = ref(null)
+const pendingEditItem = ref(null)
+const pendingDeleteItem = ref(null)
+const isOTPVerified = ref(false)
 
 const ordersById = computed(() => {
   const map = {};
@@ -39,6 +47,65 @@ async function loadOrderDetailStats() {
 /*onMounted(() => {
   axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
 })*/
+
+async function checkOTPBeforeEdit(item) {
+  if (isOTPVerified.value) {
+    onOrderDetailEditClick(item)
+    return
+  }
+  
+  pendingEditItem.value = item
+  
+  try {
+    const response = await axios.get('/api/otp/status/')
+    if (response.data.otp_verified) {
+      isOTPVerified.value = true
+      onOrderDetailEditClick(item)
+      pendingEditItem.value = null
+    } else {
+      otpModalRef.value?.showModal()
+    }
+  } catch (err) {
+    otpModalRef.value?.showModal()
+  }
+}
+
+async function checkOTPBeforeDelete(item) {
+  if (isOTPVerified.value) {
+    onRemoveClick(item)
+    return
+  }
+  
+  pendingDeleteItem.value = item
+  
+  try {
+    const response = await axios.get('/api/otp/status/')
+    if (response.data.otp_verified) {
+      isOTPVerified.value = true
+      onRemoveClick(item)
+      pendingDeleteItem.value = null
+    } else {
+      otpModalRef.value?.showModal()
+    }
+  } catch (err) {
+    otpModalRef.value?.showModal()
+  }
+}
+
+function onOTPVerified() {
+  isOTPVerified.value = true
+  
+  if (pendingEditItem.value) {
+    const itemToEdit = pendingEditItem.value
+    pendingEditItem.value = null
+    onOrderDetailEditClick(itemToEdit)
+  }
+}
+
+function onOTPCancel() {
+  pendingEditItem.value = null
+  pendingDeleteItem.value = null
+}
 
 async function fetchOrderDetails() {
   loading.value = true;
@@ -113,7 +180,11 @@ async function onRemoveClick(orderDetail) {
 }
 
 async function onOrderDetailEditClick(orderDetail) {
-  orderDetailToEdit.value = { ...orderDetail };
+  orderDetailToEdit.value = { ...orderDetail }
+  if (editModalRef.value) {
+    const modal = new Modal(editModalRef.value)
+    modal.show()
+  }
 }
 
 async function onLoadClick() {
@@ -179,8 +250,9 @@ onMounted(async () => {
       </form>
     </div>
     
+  <OTPModal ref="otpModalRef" @verified="onOTPVerified" @cancel="onOTPCancel" />
 
-    <div class="modal fade" id="editOrderDetailModal" tabindex="-1">
+    <div class="modal fade" id="editOrderDetailModal" tabindex="-1" ref="editModalRef">
       <div class="modal-dialog modal-lg">
         <div class="modal-content pb-3">
           <div class="modal-header">
@@ -275,16 +347,14 @@ onMounted(async () => {
                 <div class="d-flex gap-2 justify-content-end">
                   <button
                     class="btn btn-outline-primary btn-lg"
-                    @click="onOrderDetailEditClick(item)"
-                    data-bs-toggle="modal"
-                    data-bs-target="#editOrderDetailModal"
+                    @click="checkOTPBeforeEdit(item)"
                     title="Редактировать"
                   >
                     <i class="bi bi-pen-fill"></i>
                   </button>
                   <button 
                     class="btn btn-outline-danger btn-lg"
-                    @click="onRemoveClick(item)"
+                    @click="checkOTPBeforeDelete(item)"
                     title="Удалить"
                   >
                     <i class="bi bi-x-lg"></i>
