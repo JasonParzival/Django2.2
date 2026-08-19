@@ -3,10 +3,14 @@ import { ref } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 import Cookies from 'js-cookie'
+import { useUserStore } from '../stores/userStore'
 
 const router = useRouter()
+const userStore = useUserStore()
+
 const username = ref('')
 const password = ref('')
+const rememberMe = ref(false)
 const error = ref('')
 const loading = ref(false)
 
@@ -20,24 +24,15 @@ async function login() {
       axios.defaults.headers.common['X-CSRFToken'] = csrftoken
     }
     
-    const response = await axios.post('/api/login/', {
-      username: username.value,
-      password: password.value
-    })
+    const result = await userStore.login(username.value, password.value, rememberMe.value) 
     
-    const token = response.data.token
-    localStorage.setItem('authToken', token)
-    
-    axios.defaults.headers.common['Authorization'] = `Token ${token}`
-    
-    router.push('/products')
-  } catch (err) {
-    if (err.response && err.response.data) {
-      error.value = err.response.data.error || 'Ошибка входа'
+    if (result.success) {
+      router.push('/products')
     } else {
-      error.value = 'Неверное имя пользователя или пароль'
+      error.value = result.error
     }
-    console.error(err)
+  } catch (err) {
+    error.value = 'Произошла ошибка при входе'
   } finally {
     loading.value = false
   }
@@ -63,8 +58,10 @@ async function login() {
                   v-model="username"
                   required
                   :disabled="loading"
+                  autofocus
                 >
               </div>
+              
               <div class="mb-3">
                 <label for="password" class="form-label">Пароль</label>
                 <input 
@@ -77,6 +74,18 @@ async function login() {
                 >
               </div>
               
+              <div class="mb-3 form-check">
+                <input 
+                  type="checkbox" 
+                  class="form-check-input" 
+                  id="rememberMe"
+                  v-model="rememberMe"
+                >
+                <label class="form-check-label" for="rememberMe">
+                  Запомнить меня
+                </label>
+              </div>
+              
               <div v-if="error" class="alert alert-danger">
                 {{ error }}
               </div>
@@ -86,6 +95,7 @@ async function login() {
                 class="btn btn-primary w-100"
                 :disabled="loading"
               >
+                <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
                 {{ loading ? 'Вход...' : 'Войти' }}
               </button>
             </form>

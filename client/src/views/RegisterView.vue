@@ -1,9 +1,11 @@
 <script setup>
 import { ref } from 'vue'
-import axios from 'axios'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '../stores/userStore'
 
 const router = useRouter()
+const userStore = useUserStore()
+
 const formData = ref({
   username: '',
   password: '',
@@ -20,23 +22,16 @@ async function register() {
   loading.value = true
   
   try {
-    const response = await axios.post('/api/register/', formData.value)
+    const result = await userStore.register(formData.value)
     
-    // Сохраняем токен
-    const token = response.data.token
-    localStorage.setItem('authToken', token)
-    
-    // Устанавливаем заголовок
-    axios.defaults.headers.common['Authorization'] = `Token ${token}`
-    
-    // Перенаправляем на страницу товаров
-    router.push('/products')
-  } catch (err) {
-    if (err.response && err.response.data) {
-      errors.value = err.response.data
+    if (result.success) {
+      router.push('/products')
     } else {
-      errors.value = { non_field_errors: ['Ошибка регистрации'] }
+      errors.value = result.errors
     }
+  } catch (err) {
+    errors.value = { non_field_errors: ['Ошибка регистрации'] }
+    console.error(err)
   } finally {
     loading.value = false
   }
@@ -153,6 +148,7 @@ async function register() {
                 class="btn btn-success w-100"
                 :disabled="loading"
               >
+                <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
                 {{ loading ? 'Регистрация...' : 'Зарегистрироваться' }}
               </button>
             </form>

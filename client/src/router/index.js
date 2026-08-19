@@ -7,8 +7,8 @@ import OrderDetailsView from '../views/OrderDetailsView.vue'
 import LoginView from '../views/LoginView.vue' 
 import RegisterView from '../views/RegisterView.vue' 
 import OTPSetupView from '../views/OTPSetupView.vue'
+import { useUserStore } from '../stores/userStore'
 
-// Проверка авторизации
 const isAuthenticated = () => {
   return !!localStorage.getItem('authToken')
 }
@@ -18,7 +18,7 @@ const routes = [
     path: '/login',
     name: 'login',
     component: LoginView,
-    meta: { requiresGuest: true }  // Только для неавторизованных
+    meta: { requiresGuest: true } 
   },
   {
     path: '/register',
@@ -74,11 +74,11 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  const authenticated = isAuthenticated()
+  const userStore = useUserStore()
   
-  if (to.meta.requiresAuth && !authenticated) {
+  if (to.meta.requiresAuth && !userStore.isAuthenticated) {
     next('/login')
-  } else if (to.meta.requiresGuest && authenticated) {
+  } else if (to.meta.requiresGuest && userStore.isAuthenticated) {
     next('/products')
   } else {
     next()

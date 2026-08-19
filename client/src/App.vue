@@ -1,12 +1,12 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { useUserStore } from './stores/userStore'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 function logout() {
-  localStorage.removeItem('authToken')
-  delete axios.defaults.headers.common['Authorization']
+  userStore.logout()
   router.push('/login')
 }
 </script>
@@ -29,9 +29,11 @@ function logout() {
         <ul class="navbar-nav">
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              Пользователь
+              {{ userStore.username }}
             </a>
             <ul class="dropdown-menu dropdown-menu-end">
+              <li><span class="dropdown-item disabled">{{ userStore.isSuperuser ? '👑 Админ' : '👤 Пользователь' }}</span></li>
+              <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item" href="/admin">Админка</a></li>
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item text-danger" href="#" @click="logout">Выйти</a></li>

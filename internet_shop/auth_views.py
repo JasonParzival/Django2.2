@@ -11,6 +11,7 @@ class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField()
     
+    
 class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
     serializer_class = RegisterSerializer
@@ -28,7 +29,6 @@ class RegisterView(generics.CreateAPIView):
             user=user 
         )
         
-        # Создаем токен для пользователя
         token, created = Token.objects.get_or_create(user=user)
         
         return Response({
@@ -37,7 +37,8 @@ class RegisterView(generics.CreateAPIView):
                 "username": user.username,
                 "email": user.email,
                 "first_name": user.first_name,
-                "last_name": user.last_name
+                "last_name": user.last_name,
+                "is_superuser": user.is_superuser
             },
             "token": token.key
         }, status=status.HTTP_201_CREATED)
@@ -64,7 +65,8 @@ class LoginView(generics.GenericAPIView):
                     "username": user.username,
                     "email": user.email,
                     "first_name": user.first_name,
-                    "last_name": user.last_name
+                    "last_name": user.last_name,
+                    "is_superuser": user.is_superuser
                 }
             })
         else:

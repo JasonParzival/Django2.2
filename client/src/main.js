@@ -10,15 +10,15 @@ window.bootstrap = bootstrap
 
 import App from './App.vue'
 import router from './router'
-
-const token = localStorage.getItem('authToken')
-if (token) {
-  axios.defaults.headers.common['Authorization'] = `Token ${token}`
-}
+import { useUserStore } from './stores/userStore'
 
 const app = createApp(App)
+const pinia = createPinia()
 
-app.use(createPinia())
+app.use(pinia)
 app.use(router)
+
+const userStore = useUserStore()
+userStore.restoreUser()
 
 app.mount('#app')
