@@ -195,6 +195,52 @@ async function onLoadClick() {
 onMounted(async () => {
   await onLoadClick()
 })
+
+function exportData() {
+  const params = new URLSearchParams()
+  
+  if (filterUserId.value) {
+    params.append('user_id', filterUserId.value)
+  }
+  
+  Object.keys(activeFieldFilters.value).forEach(key => {
+    const val = activeFieldFilters.value[key]
+    if (val !== '' && val !== null && val !== undefined) {
+      params.append(key, val)
+    }
+  })
+  
+  const url = `/api/categories/export/?${params.toString()}`
+  
+  const token = localStorage.getItem('authToken')
+  
+  fetch(url, {
+    headers: {
+      'Authorization': `Token ${token}`
+    }
+  })
+  .then(response => response.blob().then(blob => {
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    
+    const contentDisposition = response.headers.get('Content-Disposition')
+    let filename = 'export.xlsx'
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="(.+)"/)
+      if (match) filename = match[1]
+    }
+    
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(link.href)
+  }))
+  .catch(error => {
+    console.error('Ошибка экспорта:', error)
+    alert('Ошибка при экспорте данных')
+  })
+}
 </script>
 
 <template>
@@ -211,6 +257,9 @@ onMounted(async () => {
       <h1>Категории</h1>
       <button @click="onLoadClick" class="btn btn-outline-primary">
         Обновить!
+      </button>
+      <button @click="exportData" class="btn btn-success ms-2">
+        Экспорт в Excel
       </button>
     </div>
 

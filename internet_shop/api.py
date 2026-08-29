@@ -29,6 +29,10 @@ from django.contrib.auth.models import User
 
 from internet_shop.serializers import OTPSerializer
 
+from openpyxl import Workbook
+from django.http import HttpResponse
+from django.utils import timezone
+
 class UsersViewset(
     mixins.ListModelMixin,
     GenericViewSet
@@ -200,6 +204,34 @@ class ProductsViewset(
         if self.action in ['update', 'partial_update', 'destroy']:
             return [IsAuthenticated(), OTPRequired()]
         return [IsAuthenticated()]
+    
+    @action(detail=False, methods=["GET"], url_path="export")
+    def export(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Товары"
+        
+        ws.append(['ID', 'Название', 'Цена', 'Описание', 'Количество', 'Категория'])
+        
+        for obj in queryset:
+            ws.append([
+                obj.id,
+                obj.name,
+                str(obj.price),
+                obj.description or '',
+                obj.quantity,
+                obj.category.name if obj.category else ''
+            ])
+        
+        filename = f"Товары_{timezone.now().strftime('%Y-%m-%d')}.xlsx"
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        wb.save(response)
+        return response
         
     class ProductStatsSerializer(serializers.Serializer):
         total_count = serializers.IntegerField()
@@ -265,6 +297,27 @@ class CategoriesViewset(
         if self.action in ['update', 'partial_update', 'destroy']:
             return [IsAuthenticated(), OTPRequired()]
         return [IsAuthenticated()]
+    
+    @action(detail=False, methods=["GET"], url_path="export")
+    def export(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Категории"
+        
+        ws.append(['ID', 'Название', 'Описание'])
+        
+        for obj in queryset:
+            ws.append([obj.id, obj.name, obj.description or ''])
+        
+        filename = f"Категории_{timezone.now().strftime('%Y-%m-%d')}.xlsx"
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        wb.save(response)
+        return response
     
     class CategoryStatsSerializer(serializers.Serializer):
         total_count = serializers.IntegerField()
@@ -347,6 +400,27 @@ class CustomersViewset(
         if self.action in ['update', 'partial_update', 'destroy']:
             return [IsAuthenticated(), OTPRequired()]
         return [IsAuthenticated()]
+    
+    @action(detail=False, methods=["GET"], url_path="export")
+    def export(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Клиенты"
+        
+        ws.append(['ID', 'ФИО', 'Адрес', 'Телефон', 'Email'])
+        
+        for obj in queryset:
+            ws.append([obj.id, obj.name, obj.address, obj.phone_number, obj.email])
+        
+        filename = f"Клиенты_{timezone.now().strftime('%Y-%m-%d')}.xlsx"
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        wb.save(response)
+        return response
     
     class CustomerStatsSerializer(serializers.Serializer):
         total_count = serializers.IntegerField()
@@ -433,6 +507,28 @@ class OrdersViewset(
         if self.action in ['update', 'partial_update', 'destroy']:
             return [IsAuthenticated(), OTPRequired()]
         return [IsAuthenticated()]
+    
+    @action(detail=False, methods=["GET"], url_path="export")
+    def export(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Заказы"
+        
+        ws.append(['ID', 'Номер заказа', 'Дата', 'Статус', 'Клиент'])
+        
+        for obj in queryset:
+            customer_name = obj.customer.name if obj.customer else ''
+            ws.append([obj.id, obj.order_number, str(obj.date), obj.status, customer_name])
+        
+        filename = f"Заказы_{timezone.now().strftime('%Y-%m-%d')}.xlsx"
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        wb.save(response)
+        return response
     
     class OrderStatsSerializer(serializers.Serializer):
         total_count = serializers.IntegerField()
@@ -523,6 +619,30 @@ class OrderDetailsViewset(
         if self.action in ['update', 'partial_update', 'destroy']:
             return [IsAuthenticated(), OTPRequired()]
         return [IsAuthenticated()]    
+    
+    @action(detail=False, methods=["GET"], url_path="export")
+    def export(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Детали заказов"
+        
+        ws.append(['ID', 'Заказ', 'Товар', 'Количество'])
+        
+        for obj in queryset:
+            order_str = f"№{obj.order.order_number} от {obj.order.date}" if obj.order else ''
+            product_name = obj.product.name if obj.product else ''
+            ws.append([obj.id, order_str, product_name, obj.quantity])
+        
+        filename = f"Детали_заказов_{timezone.now().strftime('%Y-%m-%d')}.xlsx"
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        wb.save(response)
+        return response
+    
     class OrderDetailStatsSerializer(serializers.Serializer):
         total_count = serializers.IntegerField()
         total_quantity = serializers.IntegerField()
