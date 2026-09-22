@@ -6,8 +6,10 @@ import UserFilter from '../components/UserFilter.vue'
 import OTPModal from '../components/OTPModal.vue'
 import { Modal } from 'bootstrap'
 import FilterPanel from '../components/FilterPanel.vue'
+import { useUserStore } from '../stores/userStore'
 
 const filterUserId = ref('')
+const userStore = useUserStore()
 
 const statusOptions = ref([
   { value: 'В обработке'},
@@ -81,6 +83,11 @@ async function fetchFilterCustomers() {
 }
 
 async function checkOTPBeforeEdit(item) {
+  if (userStore.isSuperuser) {
+    onOrderEditClick(item)
+    return
+  }
+
   if (isOTPVerified.value) {
     onOrderEditClick(item)
     return
@@ -103,6 +110,11 @@ async function checkOTPBeforeEdit(item) {
 }
 
 async function checkOTPBeforeDelete(item) {
+  if (userStore.isSuperuser) {
+    onRemoveClick(item)
+    return
+  }
+  
   if (isOTPVerified.value) {
     onRemoveClick(item)
     return
@@ -252,50 +264,69 @@ onMounted(async () => {
   await onLoadClick()
 })
 
-function exportData() {
+async function exportData() {
   const params = new URLSearchParams()
-  
+
   if (filterUserId.value) {
     params.append('user_id', filterUserId.value)
   }
-  
+
   Object.keys(activeFieldFilters.value).forEach(key => {
     const val = activeFieldFilters.value[key]
+
     if (val !== '' && val !== null && val !== undefined) {
       params.append(key, val)
     }
   })
-  
-  const url = `/api/orders/export/?${params.toString()}`
-  
-  const token = localStorage.getItem('authToken')
-  
-  fetch(url, {
-    headers: {
-      'Authorization': `Token ${token}`
-    }
-  })
-  .then(response => response.blob().then(blob => {
+
+  try {
+    const response = await axios.get(
+      `/api/orders/export/?${params.toString()}`,
+      {
+        responseType: 'blob'
+      }
+    )
+
+    const blob = new Blob(
+      [response.data],
+      {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }
+    )
+
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    
-    const contentDisposition = response.headers.get('Content-Disposition')
-    let filename = 'export.xlsx'
+
+    const date = new Date().toISOString().slice(0, 10)
+    let filename = `Заказы_${date}.xlsx`
+
+    const contentDisposition = response.headers['content-disposition']
+
     if (contentDisposition) {
       const match = contentDisposition.match(/filename="(.+)"/)
-      if (match) filename = match[1]
+
+      if (match) {
+        filename = match[1]
+      }
     }
-    
+
     link.download = filename
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+
     URL.revokeObjectURL(link.href)
-  }))
-  .catch(error => {
+
+  } catch (error) {
     console.error('Ошибка экспорта:', error)
+
+    if (error.response?.data instanceof Blob) {
+      const text = await error.response.data.text()
+      console.error('Ответ сервера:', text)
+    }
+
     alert('Ошибка при экспорте данных')
-  })
+  }
 }
 </script>
 
@@ -494,7 +525,7 @@ function exportData() {
       </div>
       
       <div class="stats">
-        <h3>📊 Статистика по заказам</h3>
+        <h3>Статистика по заказам</h3>
         <div class="stats-card">
           <p><strong>Всего заказов:</strong> <span id="total-orders-count">{{ orderStats?.total_count ?? 'Загрузка...' }}</span></p>
           <p><strong>Заказов сегодня:</strong> <span id="orders-today">{{ orderStats?.orders_today ?? 'Загрузка...' }}</span></p>

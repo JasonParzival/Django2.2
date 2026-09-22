@@ -6,12 +6,13 @@ import UserFilter from '../components/UserFilter.vue'
 import OTPModal from '../components/OTPModal.vue'
 import { Modal } from 'bootstrap'
 import FilterPanel from '../components/FilterPanel.vue'
+import { useUserStore } from '../stores/userStore'
 
 const filterUserId = ref('')
+const userStore = useUserStore()
 
 const loading = ref(false);
 const customers = ref([]);
-const customerToAdd = ref({ name: '', address: '', phone_number: '', email: '' });
 const customerToEdit = ref({ id: null, name: '', address: '', phone_number: '', email: '' });
 const customersPictureRef = ref();
 const customersAddImageUrl = ref();
@@ -40,6 +41,11 @@ const activeFieldFilters = ref({})
 })*/
 
 async function checkOTPBeforeEdit(item) {
+  if (userStore.isSuperuser) {
+    onCustomerEditClick(item)
+    return
+  }
+
   if (isOTPVerified.value) {
     onCustomerEditClick(item)
     return
@@ -62,6 +68,11 @@ async function checkOTPBeforeEdit(item) {
 }
 
 async function checkOTPBeforeDelete(item) {
+  if (userStore.isSuperuser) {
+    onRemoveClick(item)
+    return
+  }
+
   if (isOTPVerified.value) {
     onRemoveClick(item)
     return
@@ -128,56 +139,29 @@ async function fetchCustomers() {
 function onFilterChange(userId) {
   filterUserId.value = userId;
   fetchCustomers();     
-  loadCustomerStats();   
+  if (userStore.isSuperuser) {
+    loadCustomerStats()
+  }  
 }
 
 function onFieldFilterChange(filters) {
   activeFieldFilters.value = filters
   fetchCustomers()
-  loadCustomerStats()
+  if (userStore.isSuperuser) {
+    loadCustomerStats()
+  }
 }
 
 function onFieldFilterReset() {
   activeFieldFilters.value = {}
   fetchCustomers()
-  loadCustomerStats()
+  if (userStore.isSuperuser) {
+    loadCustomerStats()
+  }
 }
 
 async function customersAddPictureChange() {
   customersAddImageUrl.value = URL.createObjectURL(customersPictureRef.value.files[0])
-}
-
-async function onCustomerAdd() {
-  const formData = new FormData();
-
-  // проверяем, выбран ли файл перед добавлением
-  if (customersPictureRef.value.files[0]) {
-    formData.append('picture', customersPictureRef.value.files[0]);
-  }
-
-  // явно привязываем поля из customerToAdd
-  formData.set('name', customerToAdd.value.name)
-  formData.set('address', customerToAdd.value.address)
-  formData.set('phone_number', customerToAdd.value.phone_number)
-  formData.set('email', customerToAdd.value.email)
-
-  try {
-    // ну и тут указываем в заголовке что отправляем данные с файлом
-    await axios.post("/api/customers/", formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data'
-        }
-    });
-    await fetchCustomers();
-    
-    // Сброс формы
-    customerToAdd.value = { name: '', address: '', phone_number: '', email: '' };
-    customersPictureRef.value.value = ''; // очищаем input file
-    customersAddImageUrl.value = ''; // очищаем превью
-  } catch (error) {
-    console.error('Error details:', error.response.data);
-    alert('Ошибка при добавлении клиента: ' + JSON.stringify(error.response.data));
-  }
 }
 
 async function onUpdateCustomer() {
@@ -228,12 +212,16 @@ async function onCustomerEditClick(customer) {
 }
 
 async function onLoadClick() {
-  await fetchCustomers()
-  loading.value = true;
+  loading.value = true
+
   try {
-    await Promise.all([await fetchCustomers(), loadCustomerStats()]);
+    await fetchCustomers()
+
+    if (userStore.isSuperuser) {
+      await loadCustomerStats()
+    }
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
@@ -245,50 +233,69 @@ function openImageModal(imageUrl) {
   imageModalUrl.value = imageUrl
 }
 
-function exportData() {
+async function exportData() {
   const params = new URLSearchParams()
-  
+
   if (filterUserId.value) {
     params.append('user_id', filterUserId.value)
   }
-  
+
   Object.keys(activeFieldFilters.value).forEach(key => {
     const val = activeFieldFilters.value[key]
+
     if (val !== '' && val !== null && val !== undefined) {
       params.append(key, val)
     }
   })
-  
-  const url = `/api/customers/export/?${params.toString()}`
-  
-  const token = localStorage.getItem('authToken')
-  
-  fetch(url, {
-    headers: {
-      'Authorization': `Token ${token}`
-    }
-  })
-  .then(response => response.blob().then(blob => {
+
+  try {
+    const response = await axios.get(
+      `/api/customers/export/?${params.toString()}`,
+      {
+        responseType: 'blob'
+      }
+    )
+
+    const blob = new Blob(
+      [response.data],
+      {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }
+    )
+
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    
-    const contentDisposition = response.headers.get('Content-Disposition')
-    let filename = 'export.xlsx'
+
+    const date = new Date().toISOString().slice(0, 10)
+    let filename = `Клиенты_${date}.xlsx`
+
+    const contentDisposition = response.headers['content-disposition']
+
     if (contentDisposition) {
       const match = contentDisposition.match(/filename="(.+)"/)
-      if (match) filename = match[1]
+
+      if (match) {
+        filename = match[1]
+      }
     }
-    
+
     link.download = filename
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+
     URL.revokeObjectURL(link.href)
-  }))
-  .catch(error => {
+
+  } catch (error) {
     console.error('Ошибка экспорта:', error)
+
+    if (error.response?.data instanceof Blob) {
+      const text = await error.response.data.text()
+      console.error('Ответ сервера:', text)
+    }
+
     alert('Ошибка при экспорте данных')
-  })
+  }
 }
 </script>
 
@@ -308,94 +315,24 @@ function exportData() {
   </div>
 
   <div class="container my-5">
-    <UserFilter @filter-change="onFilterChange" />
+    <div v-if="userStore.isSuperuser">
+      <UserFilter @filter-change="onFilterChange" />
 
-    <FilterPanel 
-      :filters="fieldFilters" 
-      @filter-change="onFieldFilterChange"
-      @filter-reset="onFieldFilterReset"
-    />
+      <FilterPanel 
+        :filters="fieldFilters" 
+        @filter-change="onFieldFilterChange"
+        @filter-reset="onFieldFilterReset"
+      />
+    </div>
 
     <div class="d-flex justify-content-between align-items-center mb-4">
-      <h1>Клиенты</h1>
+      <h1>{{ userStore.isSuperuser ? 'Клиенты' : 'Профиль' }}</h1>
       <button @click="onLoadClick" class="btn btn-outline-primary">
         Обновить!
       </button>
       <button @click="exportData" class="btn btn-success ms-2">
         Экспорт в Excel
       </button>
-    </div>
-
-    <div class="container mb-5">
-      <form @submit.prevent.stop="onCustomerAdd">
-        <div class="row">
-          <div class="col">
-            <div class="form-floating">
-              <input
-                type="text"
-                class="form-control"
-                v-model="customerToAdd.name"
-                required
-              />
-              <label for="floatingInput">ФИО</label>
-            </div>
-          </div>
-          <div class="col">
-            <div class="form-floating">
-              <input
-                type="text"
-                class="form-control"
-                v-model="customerToAdd.address"
-                required
-              />
-              <label for="floatingInput">Адрес</label>
-            </div>
-          </div>
-          <div class="col-auto">
-            <div class="form-floating">
-              <input
-                type="file"
-                class="form-control"
-                ref="customersPictureRef"
-                @change="customersAddPictureChange"
-              />
-            </div>
-          </div>
-          <div class="col-auto">
-            <img :src="customersAddImageUrl" 
-            style="max-height: 60px;" 
-            alt=""
-            >
-          </div>
-          <div class="col">
-            <div class="form-floating">
-              <input
-                type="text"
-                class="form-control"
-                v-model="customerToAdd.phone_number"
-                required
-              />
-              <label for="floatingInput">Номер телефона</label>
-            </div>
-          </div>
-          <div class="col">
-            <div class="form-floating">
-              <input
-                type="text"
-                class="form-control"
-                v-model="customerToAdd.email"
-                required
-              />
-              <label for="floatingInput">Электронная почта</label>
-            </div>
-          </div>
-          <div class="col-auto">
-            <button class="btn btn-primary">
-              Добавить
-            </button>
-          </div>
-        </div>
-      </form>
     </div>
     
   <OTPModal ref="otpModalRef" @verified="onOTPVerified" @cancel="onOTPCancel" />
@@ -537,6 +474,7 @@ function exportData() {
                     <i class="bi bi-pen-fill"></i>
                   </button>
                   <button 
+                    v-if="userStore.isSuperuser"
                     class="btn btn-outline-danger btn-lg"
                     @click="checkOTPBeforeDelete(item)"
                     title="Удалить"
@@ -554,8 +492,8 @@ function exportData() {
         </div>
       </div>
       
-      <div class="stats">
-        <h3>📊 Статистика по клиентам</h3>
+      <div v-if="userStore.isSuperuser" class="stats">
+        <h3>Статистика по клиентам</h3>
         <div class="stats-card">
           <p><strong>Всего клиентов:</strong> <span id="total-customers">{{ customerStats?.total_count ?? 'Загрузка...' }}</span></p>
           <p><strong>Клиентов с заказами: </strong> 

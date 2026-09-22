@@ -31,19 +31,10 @@ class CategorySerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     #category = CategorySerializer(read_only=True)
     category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
-    
-    """def create(self, validated_data):
-        if 'request' in self.context:
-            validated_data['user'] = self.context['request'].user
-        return super().create(validated_data)"""
         
     def create(self, validated_data):
-        print(f"Request in context: {'request' in self.context}")
         if 'request' in self.context:
-            print(f"User: {self.context['request'].user}")
             validated_data['user'] = self.context['request'].user
-        else:
-            print("No request in context!")
         return super().create(validated_data)
     
     class Meta:
@@ -74,7 +65,7 @@ class OrderSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Order
-        fields = ['id', 'order_number', 'date', 'status', 'customer', 'user']
+        fields = ['id', 'order_number', 'date', 'status', 'customer']
         read_only_fields = ['user']
 
 # №5     
@@ -91,5 +82,5 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = OrderDetail
-        fields = ['id', 'order', 'product', 'quantity', 'user']
+        fields = ['id', 'order', 'product', 'quantity']
         read_only_fields = ['user']

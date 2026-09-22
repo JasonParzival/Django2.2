@@ -21,14 +21,6 @@ class RegisterView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         
-        Customer.objects.create(
-            name=f"{user.first_name} {user.last_name}".strip() or user.username,
-            address="",  
-            phone_number="", 
-            email=user.email,
-            user=user 
-        )
-        
         token, created = Token.objects.get_or_create(user=user)
         
         return Response({

@@ -14,6 +14,21 @@
         <div class="modal-body">
           <p class="text-muted">Введите 6-значный код из Google Authenticator</p>
           
+          <div v-if="qrCode" class="text-center mb-3">
+            <img
+              :src="qrCode"
+              alt="QR-код"
+              class="img-fluid border rounded p-2"
+              style="max-width: 220px;"
+            >
+
+            <div v-if="otpKey" class="mt-2">
+              <small class="text-muted">
+                Ключ: {{ otpKey }}
+              </small>
+            </div>
+          </div>
+
           <div class="mb-3">
             <label class="form-label">Код подтверждения</label>
             <input
@@ -72,8 +87,23 @@ const code = ref('')
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
+const otpKey = ref('')
+const qrCode = ref('')
+
 let modalInstance = null
 let isVerified = false
+
+async function loadOTPSetup() {
+  try {
+    const response = await axios.get('/api/otp/setup/')
+
+    otpKey.value = response.data.otp_key || ''
+    qrCode.value = response.data.qr_code || ''
+  } catch (err) {
+    console.error('Ошибка получения QR-кода OTP:', err)
+    error.value = 'Не удалось загрузить QR-код'
+  }
+}
 
 function onCodeInput() {
   code.value = code.value.replace(/\D/g, '')
@@ -132,10 +162,14 @@ function resetState() {
   success.value = ''
   loading.value = false
   isVerified = false
+  otpKey.value = ''
+  qrCode.value = ''
 }
 
 function showModal() {
   resetState()
+  loadOTPSetup()
+  
   if (modalInstance) {
     modalInstance.show()
     setTimeout(() => {

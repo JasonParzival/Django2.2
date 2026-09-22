@@ -15,9 +15,24 @@
             
             <div v-else>
               <p class="text-muted">
-                Для защиты ваших данных, перед редактированием необходимо подтверждение через Google Authenticator.
+                Перед редактированием необходимо подтверждение через Google Authenticator.
               </p>
               
+              <div v-if="qrCode" class="text-center mb-4">
+                <img
+                  :src="qrCode"
+                  alt="QR-код"
+                  class="img-fluid border rounded p-2"
+                  style="max-width: 220px;"
+                >
+
+                <div v-if="otpKey" class="mt-2">
+                  <small class="text-muted">
+                    Ключ: {{ otpKey }}
+                  </small>
+                </div>
+              </div>
+
               <div class="mb-3">
                 <label class="form-label">Введите 6-значный код</label>
                 <input
@@ -52,7 +67,6 @@
             <hr>
             
             <div class="mt-3">
-              <h6>Информация:</h6>
               <ul class="text-muted small">
                 <li>Код обновляется каждые 30 секунд</li>
                 <li>После подтверждения у вас есть 60 секунд на редактирование</li>
@@ -75,9 +89,22 @@ const loading = ref(false)
 const error = ref('')
 const success = ref('')
 const otpVerified = ref(false)
+const otpKey = ref('')
+const qrCode = ref('')
 
 function onCodeInput() {
   code.value = code.value.replace(/\D/g, '')
+}
+
+async function loadOTPSetup() {
+  try {
+    const response = await axios.get('/api/otp/setup/')
+
+    otpKey.value = response.data.otp_key || ''
+    qrCode.value = response.data.qr_code || ''
+  } catch (err) {
+    console.error('Ошибка получения QR-кода OTP:', err)
+  }
 }
 
 async function verifyOTP() {
@@ -119,6 +146,7 @@ async function checkStatus() {
 
 onMounted(() => {
   checkStatus()
+  loadOTPSetup()
   setInterval(checkStatus, 5000)
 })
 </script>

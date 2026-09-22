@@ -1,5 +1,6 @@
 /.venv
 db.sqlite3
+db copy.sqlite3
 /internet_shop/__pycache__
 /internet_shop/migrations
 /app/__pycache__

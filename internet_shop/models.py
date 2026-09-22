@@ -2,7 +2,7 @@ from django.db import models
 
 from django.contrib.auth.models import User
 
-class UserProfile(models.Model):
+"""class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     otp_key = models.CharField("OTP ключ", max_length=255, null=True, blank=True)
     
@@ -11,7 +11,7 @@ class UserProfile(models.Model):
         verbose_name_plural = "Профили пользователей"
     
     def __str__(self):
-        return f"Профиль {self.user.username}"
+        return f"Профиль {self.user.username}"/"""
     
     
 class Product(models.Model):
@@ -51,7 +51,20 @@ class Customer(models.Model):
     email = models.TextField("Электронная почта")
     picture = models.ImageField("Изображение", null=True, upload_to="customers")
     
-    user = models.ForeignKey(User, verbose_name="Пользователь", on_delete=models.CASCADE, null=True)
+    otp_key = models.CharField(
+        "OTP ключ",
+        max_length=255,
+        null=True,
+        blank=True
+    )
+
+    user = models.OneToOneField(
+        User,
+        verbose_name="Пользователь",
+        on_delete=models.CASCADE,
+        null=True,
+        related_name="profile"
+    )
     
     class Meta:
         verbose_name = "Клиент"
@@ -73,7 +86,7 @@ class Order(models.Model):
     ], 
     default='В обработке' )
     customer = models.ForeignKey("Customer", on_delete=models.CASCADE, null=True, verbose_name="Клиент")
-    user = models.ForeignKey(User, verbose_name="Пользователь", on_delete=models.CASCADE, null=True) 
+    #user = models.ForeignKey(User, verbose_name="Пользователь", on_delete=models.CASCADE, null=True) 
     
     class Meta:
         verbose_name = "Заказ"
@@ -86,7 +99,7 @@ class OrderDetail(models.Model):
     order = models.ForeignKey("Order", on_delete=models.CASCADE, null=True, verbose_name="Заказ")
     product = models.ForeignKey("Product", on_delete=models.CASCADE, null=True, verbose_name="Продукт")
     quantity = models.IntegerField("Количество")
-    user = models.ForeignKey(User, verbose_name="Пользователь", on_delete=models.CASCADE, null=True) 
+    #user = models.ForeignKey(User, verbose_name="Пользователь", on_delete=models.CASCADE, null=True) 
     
     class Meta:
         verbose_name = "Детали заказа"

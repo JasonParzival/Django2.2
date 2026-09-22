@@ -32,6 +32,11 @@ from internet_shop.serializers import OTPSerializer
 from openpyxl import Workbook
 from django.http import HttpResponse
 from django.utils import timezone
+from django.db import transaction
+
+import base64
+from io import BytesIO
+import qrcode
 
 class UsersViewset(
     mixins.ListModelMixin,
@@ -139,9 +144,19 @@ class OTPViewset(GenericViewSet):
             issuer_name="Интернет-магазин"
         )
         
+        qr = qrcode.make(provisioning_uri)
+
+        qr_buffer = BytesIO()
+        qr.save(qr_buffer, format='PNG')
+
+        qr_code = 'data:image/png;base64,' + base64.b64encode(
+            qr_buffer.getvalue()
+        ).decode('ascii')
+        
         return Response({
             'otp_key': otp_key,
             'provisioning_uri': provisioning_uri,
+            'qr_code': qr_code,
             'username': request.user.username
         })
 
@@ -165,8 +180,8 @@ class ProductsViewset(
             user_id = self.request.query_params.get('user_id')
             if user_id:
                 qs = qs.filter(user_id=user_id)
-        else:
-            qs = qs.filter(user=self.request.user)
+        '''else:
+            qs = qs.filter(user=self.request.user)'''
         
         params = self.request.query_params
         
@@ -242,10 +257,7 @@ class ProductsViewset(
     
     @action(detail=False, methods=["GET"], url_path="stats")
     def get_stats(self, request, *args, **kwargs):
-        if request.user.is_superuser:
-            queryset = Product.objects.all()
-        else:
-            queryset = Product.objects.filter(user=request.user)
+        queryset = Product.objects.all()
         
         stats = queryset.aggregate(
             total_count=Count("id"),
@@ -278,8 +290,8 @@ class CategoriesViewset(
             user_id = self.request.query_params.get('user_id')
             if user_id:
                 qs = qs.filter(user_id=user_id)
-        else:
-            qs = qs.filter(user=self.request.user)
+        '''else:
+            qs = qs.filter(user=self.request.user)'''
         
         params = self.request.query_params
         
@@ -326,12 +338,8 @@ class CategoriesViewset(
     
     @action(detail=False, methods=["GET"], url_path="stats")
     def get_stats(self, request, *args, **kwargs):
-        if request.user.is_superuser:
-            user_categories = Category.objects.all()
-            user_products = Product.objects.all()
-        else:
-            user_categories = Category.objects.filter(user=request.user)
-            user_products = Product.objects.filter(user=request.user)
+        user_categories = Category.objects.all()
+        user_products = Product.objects.all()
         
         total_categories = user_categories.count()
         total_products = user_products.count()
@@ -435,7 +443,7 @@ class CustomersViewset(
             user_orders = Order.objects.all()
         else:
             user_customers = Customer.objects.filter(user=request.user)
-            user_orders = Order.objects.filter(user=request.user)
+            user_orders = Order.objects.filter(customer__user=request.user)
         
         total_customers = user_customers.count()
         total_orders = user_orders.count()
@@ -475,9 +483,9 @@ class OrdersViewset(
         if self.request.user.is_superuser:
             user_id = self.request.query_params.get('user_id')
             if user_id:
-                qs = qs.filter(user_id=user_id)
+                qs = qs.filter(customer__user_id=user_id)
         else:
-            qs = qs.filter(user=self.request.user)
+            qs = qs.filter(customer__user=self.request.user)
         
         params = self.request.query_params
         
@@ -502,6 +510,116 @@ class OrdersViewset(
             qs = qs.filter(customer_id=customer)
         
         return qs
+    
+    @action(detail=False, methods=["POST"], url_path="checkout")
+    def checkout(self, request, *args, **kwargs):
+        items = request.data.get('items', [])
+
+        if not items:
+            return Response(
+                {'error': 'Корзина пуста'},
+                status=400
+            )
+
+        try:
+            with transaction.atomic():
+
+                try:
+                    customer = request.user.profile
+                except Customer.DoesNotExist:
+                    return Response(
+                        {'error': 'Профиль пользователя не найден'},
+                        status=400
+                    )
+
+                today = timezone.now().date()
+
+                last_order = Order.objects.filter(
+                    date=today
+                ).order_by('-order_number').first()
+
+                order_number = (
+                    last_order.order_number + 1
+                    if last_order
+                    else 1
+                )
+
+                checked_items = []
+
+                for item in items:
+                    product_id = item.get('product_id')
+                    quantity = item.get('quantity')
+
+                    if not product_id or not quantity:
+                        return Response(
+                            {'error': 'Некорректные данные товара'},
+                            status=400
+                        )
+
+                    quantity = int(quantity)
+
+                    if quantity <= 0:
+                        return Response(
+                            {'error': 'Количество товара должно быть больше 0'},
+                            status=400
+                        )
+
+                    try:
+                        product = Product.objects.select_for_update().get(
+                            id=product_id
+                        )
+                    except Product.DoesNotExist:
+                        return Response(
+                            {'error': f'Товар с ID {product_id} не найден'},
+                            status=404
+                        )
+
+                    if product.quantity < quantity:
+                        return Response(
+                            {
+                                'error': (
+                                    f'Недостаточно товара "{product.name}". '
+                                    f'Осталось: {product.quantity}'
+                                )
+                            },
+                            status=400
+                        )
+
+                    checked_items.append((product, quantity))
+
+                order = Order.objects.create(
+                    order_number=order_number,
+                    date=today,
+                    status='В обработке',
+                    customer=customer,
+                )
+
+                for product, quantity in checked_items:
+
+                    OrderDetail.objects.create(
+                        order=order,
+                        product=product,
+                        quantity=quantity,
+                    )
+
+                    product.quantity -= quantity
+                    product.save(update_fields=['quantity'])
+
+                return Response(
+                    {
+                        'success': True,
+                        'message': 'Заказ успешно оформлен',
+                        'order_id': order.id,
+                        'order_number': order.order_number
+                    },
+                    status=201
+                )
+
+        except ValueError:
+            return Response(
+                {'error': 'Количество товара должно быть числом'},
+                status=400
+            )
     
     def get_permissions(self):
         if self.action in ['update', 'partial_update', 'destroy']:
@@ -543,7 +661,7 @@ class OrdersViewset(
         if request.user.is_superuser:
             user_orders = Order.objects.all()
         else:
-            user_orders = Order.objects.filter(user=request.user)
+            user_orders = Order.objects.filter(customer__user=request.user)
         
         total_orders = user_orders.count()
         
@@ -591,9 +709,9 @@ class OrderDetailsViewset(
         if self.request.user.is_superuser:
             user_id = self.request.query_params.get('user_id')
             if user_id:
-                qs = qs.filter(user_id=user_id)
+                qs = qs.filter(order__customer__user_id=user_id)
         else:
-            qs = qs.filter(user=self.request.user)
+            qs = qs.filter(order__customer__user=self.request.user)
         
         params = self.request.query_params
         
@@ -655,7 +773,7 @@ class OrderDetailsViewset(
         if request.user.is_superuser:
             user_order_details = OrderDetail.objects.all()
         else:
-            user_order_details = OrderDetail.objects.filter(user=request.user)
+            user_order_details = OrderDetail.objects.filter(order__customer__user=request.user)
         
         stats = user_order_details.aggregate(
             total_count=Count("id"),

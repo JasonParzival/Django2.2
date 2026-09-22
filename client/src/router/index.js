@@ -8,6 +8,7 @@ import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue' 
 import OTPSetupView from '../views/OTPSetupView.vue'
 import { useUserStore } from '../stores/userStore'
+import CartView from '../views/CartView.vue'
 
 const isAuthenticated = () => {
   return !!localStorage.getItem('authToken')
@@ -65,6 +66,11 @@ const routes = [
     name: 'otp',
     component: OTPSetupView,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/cart',
+    name: 'cart',
+    component: CartView
   },
 ]
 

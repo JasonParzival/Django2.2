@@ -20,10 +20,13 @@ function logout() {
         <div class="navbar-nav">
           <router-link to="/products" class="nav-link">Товары</router-link>
           <router-link to="/categories" class="nav-link">Категории</router-link>
-          <router-link to="/customers" class="nav-link">Клиент</router-link>
           <router-link to="/orders" class="nav-link">Заказы</router-link>
           <router-link to="/orderDetails" class="nav-link">Детали заказа</router-link>
-          <router-link to="/otp" class="nav-link">🔐 2FA</router-link>
+          <router-link to="/customers" class="nav-link">
+            {{ userStore.isSuperuser ? 'Клиенты' : 'Профиль' }}
+          </router-link>
+          
+          <router-link to="/otp" class="nav-link">2FA</router-link>
         </div>
 
         <ul class="navbar-nav">
@@ -32,7 +35,9 @@ function logout() {
               {{ userStore.username }}
             </a>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li><span class="dropdown-item disabled">{{ userStore.isSuperuser ? '👑 Админ' : '👤 Пользователь' }}</span></li>
+              <li><span class="dropdown-item disabled">{{ userStore.isSuperuser ? 'Админ' : 'Пользователь' }}</span></li>
+              <li><hr class="dropdown-divider"></li>
+              <li v-if="!userStore.isSuperuser"><router-link class="dropdown-item" to="/cart">Корзина</router-link></li>
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item" href="/admin">Админка</a></li>
               <li><hr class="dropdown-divider"></li>

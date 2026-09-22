@@ -6,8 +6,10 @@ import UserFilter from '../components/UserFilter.vue'
 import OTPModal from '../components/OTPModal.vue'
 import { Modal } from 'bootstrap'
 import FilterPanel from '../components/FilterPanel.vue'
+import { useUserStore } from '../stores/userStore'
 
 const filterUserId = ref('')
+const userStore = useUserStore()
 
 const loading = ref(false);
 const products = ref([]);
@@ -18,6 +20,14 @@ const productsPictureRef = ref();
 const productsAddImageUrl = ref();
 
 const productStats = ref(null);
+const cart = ref([])
+
+function loadCart() {
+  const key = `cart_user_${userStore.user?.id}`
+  cart.value = JSON.parse(localStorage.getItem(key) || '[]')
+}
+
+loadCart()
 
 const imageModalUrl = ref("")
 
@@ -51,6 +61,11 @@ const groupsById = computed(() => {
 })*/
 
 async function checkOTPBeforeEdit(item) {
+  if (userStore.isSuperuser) {
+    onProductEditClick(item)
+    return
+  }
+
   if (isOTPVerified.value) {
     onProductEditClick(item)
     return
@@ -73,6 +88,11 @@ async function checkOTPBeforeEdit(item) {
 }
 
 async function checkOTPBeforeDelete(item) {
+  if (userStore.isSuperuser) {
+    onRemoveClick(item)
+    return
+  }
+  
   if (isOTPVerified.value) {
     onRemoveClick(item)
     return
@@ -253,6 +273,33 @@ async function onProductAdd() {
   }
 }
 
+function addToCart(product) {
+  const existingItem = cart.value.find(item => item.id === product.id)
+
+  if (existingItem) {
+    if (existingItem.cartQuantity < product.quantity) {
+      existingItem.cartQuantity++
+    } else {
+      alert('Нельзя добавить больше товара')
+      return
+    }
+  } else {
+    cart.value.push({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: product.quantity,
+      picture: product.picture,
+      cartQuantity: 1
+    })
+  }
+
+  localStorage.setItem(
+    `cart_user_${userStore.user?.id}`,
+    JSON.stringify(cart.value)
+  )
+}
+
 async function onUpdateProduct() {
   const formData = new FormData();
 
@@ -319,52 +366,69 @@ function openImageModal(imageUrl) {
   imageModalUrl.value = imageUrl
 }
 
-function exportData() {
+async function exportData() {
   const params = new URLSearchParams()
-  
+
   if (filterUserId.value) {
     params.append('user_id', filterUserId.value)
   }
-  
+
   Object.keys(activeFieldFilters.value).forEach(key => {
     const val = activeFieldFilters.value[key]
+
     if (val !== '' && val !== null && val !== undefined) {
       params.append(key, val)
     }
   })
-  
-  const url = `/api/products/export/?${params.toString()}`
-  
-  const token = localStorage.getItem('authToken')
 
-  fetch(url, {
-    headers: {
-      'Authorization': `Token ${token}`
-    }
-  })
-  .then(response => {
-    return response.blob().then(blob => {
-      const link = document.createElement('a')
-      link.href = URL.createObjectURL(blob)
-      
-      const contentDisposition = response.headers.get('Content-Disposition')
-      let filename = 'export.xlsx'
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename="(.+)"/)
-        if (match) filename = match[1]
+  try {
+    const response = await axios.get(
+      `/api/products/export/?${params.toString()}`,
+      {
+        responseType: 'blob'
       }
-      
-      link.download = filename
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(link.href)
-    })
-  })
-  .catch(error => {
+    )
+
+    const blob = new Blob(
+      [response.data],
+      {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }
+    )
+
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+
+    const date = new Date().toISOString().slice(0, 10)
+    let filename = `Товары_${date}.xlsx`
+
+    const contentDisposition = response.headers['content-disposition']
+
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="(.+)"/)
+
+      if (match) {
+        filename = match[1]
+      }
+    }
+
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    URL.revokeObjectURL(link.href)
+
+  } catch (error) {
     console.error('Ошибка экспорта:', error)
+
+    if (error.response?.data instanceof Blob) {
+      const text = await error.response.data.text()
+      console.error('Ответ сервера:', text)
+    }
+
     alert('Ошибка при экспорте данных')
-  })
+  }
 }
 </script>
 
@@ -626,6 +690,16 @@ function exportData() {
               <div class="col-md-2">
                 <div class="d-flex gap-2 justify-content-end">
                   <button
+                    v-if="!userStore.isSuperuser"
+                    class="btn btn-outline-success btn-lg"
+                    @click="addToCart(item)"
+                    title="Добавить в корзину"
+                    :disabled="item.quantity <= 0"
+                  >
+                    <i class="bi bi-cart-plus"></i>
+                  </button>
+                  <button
+                    v-if="userStore.isSuperuser"
                     class="btn btn-outline-primary btn-lg"
                     @click="checkOTPBeforeEdit(item)"
                     title="Редактировать"
@@ -633,6 +707,7 @@ function exportData() {
                     <i class="bi bi-pen-fill"></i>
                   </button>
                   <button 
+                    v-if="userStore.isSuperuser"
                     class="btn btn-outline-danger btn-lg"
                     @click="checkOTPBeforeDelete(item)"
                     title="Удалить"
@@ -651,7 +726,7 @@ function exportData() {
       </div>
       
       <div class="stats">
-        <h3>📊 Статистика по товарам</h3>
+        <h3>Статистика по товарам</h3>
         <div class="stats-card">
           <p><strong>Всего товаров:</strong> <span id="total-products">{{ productStats?.total_count ?? 'Загрузка...' }}</span></p>
           <p><strong>Средняя цена:</strong> <span id="avg-price">{{ productStats?.avg_price ? productStats.avg_price + ' ₽' : 'Загрузка...' }}</span></p>
